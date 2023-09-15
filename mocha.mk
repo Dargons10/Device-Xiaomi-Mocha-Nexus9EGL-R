@@ -213,6 +213,7 @@ PRODUCT_COPY_FILES += \
 
 #OMX(SOFTWARE)
 PRODUCT_PROPERTY_OVERRIDES += \
+    debug.stagefright.c2-poolmask=0x80000\
     debug.stagefright.ccodec=0
 
 # Overlay
