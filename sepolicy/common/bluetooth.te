@@ -31,7 +31,7 @@ allow bluetooth proc_bluetooth_mac:file r_file_perms;
 allow bluetooth anr_data_file:file write;
 
 # Access bdaddr_path_prop
-get_prop(bluetooth, bdaddr_path_prop)
+# get_prop(bluetooth, bdaddr_path_prop)
 
 # Bluedroid logs
 allow bluetooth bluetooth_log_file:file create_file_perms;
