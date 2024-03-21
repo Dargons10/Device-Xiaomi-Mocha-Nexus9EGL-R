@@ -1,7 +1,3 @@
-# API
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.product.first_api_level=23
-
 # AptX
 PRODUCT_PROPERTY_OVERRIDES += \
     persist.bt.enableAptXHD=true \
