@@ -135,8 +135,11 @@ PRODUCT_PACKAGES += \
     libshim_zw \
     libshim_atomic
 
-# Use GO
-$(call inherit-product, $(SRC_TARGET_DIR)/product/go_defaults.mk)
+
+# Health HAL
+PRODUCT_PACKAGES += \
+    android.hardware.health@2.0-impl \
+    android.hardware.health@2.0-service
 
 # HIDL
 PRODUCT_PACKAGES += \
