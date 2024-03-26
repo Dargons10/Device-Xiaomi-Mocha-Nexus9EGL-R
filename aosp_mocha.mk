@@ -6,7 +6,7 @@ $(call inherit-product, vendor/aosp/config/common.mk)
 
 
 TARGET_GAPPS_ARCH := arm
-TARGET_BOOT_ANIMATION_RES := 1080p
+TARGET_BOOT_ANIMATION_RES := 1080
 
 PRODUCT_NAME := aosp_mocha
 PRODUCT_DEVICE := mocha
