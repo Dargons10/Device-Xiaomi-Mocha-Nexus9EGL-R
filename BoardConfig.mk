@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-
 # Path
 LOCAL_PATH := device/xiaomi/mocha
 
@@ -74,6 +73,9 @@ endif
 BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
 BUILD_BROKEN_PREBUILT_ELF_FILES := true
 LOCAL_CHECK_ELF_FILES := false
+
+# Exclude AudioFX
+TARGET_EXCLUDES_AUDIOFX := true
 
 # FM
 BOARD_HAVE_BCM_FM := false
