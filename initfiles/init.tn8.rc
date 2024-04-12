@@ -21,6 +21,10 @@ on post-fs-data
     chmod 0664 /sys/class/gpio/gpio61/value
     chmod 0644 /sys/kernel/cluster/active
     mkdir /data/sensors 0777 system system
+    chown system system /sys/devices/platform/host1x/tegradc.0/color_filter
+    chown system system /sys/devices/platform/host1x/tegradc.0/color_filter_rgb
+    chmod 0644 /sys/devices/platform/host1x/tegradc.0/color_filter
+    chmod 0644 /sys/devices/platform/host1x/tegradc.0/color_filter_rgb
 
 on init
     # Mount a tmpfs into /mnt/tmp for hosting nvram, phs shared memory
