@@ -311,10 +311,6 @@ PRODUCT_SOONG_NAMESPACES += device/xiaomi/mocha
 # System properties
 -include $(LOCAL_PATH)/system_prop.mk
 
-# Thermal
-PRODUCT_PACKAGES += \
-   thermalhal.tn8.xml
-
 # TimeKeep
 PRODUCT_PACKAGES += \
     timekeep \
