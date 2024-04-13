@@ -4,13 +4,7 @@ echo $1
 rootdirectory="$PWD"
 # ---------------------------------
 
-<<<<<<< HEAD
-dirs=" bionic/ system/core frameworks/native  frameworks/base external/selinux" 
-
-
-=======
 dirs="bionic/libm frameworks/native frameworks/av  external/selinux system/extras system/core" 
->>>>>>> faf415f (libstagefrighthw patched)
 
 # red + nocolor
 RED='\033[0;31m'
