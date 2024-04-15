@@ -183,6 +183,9 @@ TARGET_LD_SHIM_LIBS := \
 # ThermalHAL
 TARGET_THERMALHAL_VARIANT := tegra
 
+#WEBGL in WebKit
+ENABLE_WEBGL := true
+
 # Wifi related defines
 BOARD_WPA_SUPPLICANT_DRIVER      := NL80211
 WPA_SUPPLICANT_VERSION           := VER_0_8_X
