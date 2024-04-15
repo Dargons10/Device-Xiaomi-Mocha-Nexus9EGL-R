@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-     Copyright (C) 2020 The LineageOS Project
+     Copyright (c) 2016 The Android Open Source Project
 
      Licensed under the Apache License, Version 2.0 (the "License");
      you may not use this file except in compliance with the License.
@@ -15,11 +15,5 @@
      limitations under the License.
 -->
 <resources>
-    <string name="display_panel_title">Display Configuration</string>
-    <string name="display_panel_summary">Adjust external display and dock settings</string>
-    <string name="cust_category_title">Customization</string>
-    <string name="bright_pref_title">Adjust System Brightness</string>
-    <string name="mode_selection_title">Select Mode</string>
-    <string name="mode_confirmation_title">Confirmation</string>
-    <string name="mode_confirmation_summary">Are you sure you want to keep these display settings?\n\nWill revert in %1$d seconds</string>
+    <color name="fastlane_background">#3e0e2f</color>
 </resources>

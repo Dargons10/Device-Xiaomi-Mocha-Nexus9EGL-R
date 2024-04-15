@@ -1,5 +1,7 @@
 LOCAL_PATH:= $(call my-dir)
 
+ifneq ($(LINEAGE_BUILD),)
+
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
@@ -14,10 +16,12 @@ LOCAL_USE_AAPT2 := true
 LOCAL_STATIC_ANDROID_LIBRARIES := \
     androidx.core_core \
     androidx.preference_preference \
-    
+    androidx.leanback_leanback \
+    androidx.leanback_leanback-preference
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
-   vendor.nvidia.hardware.graphics.display-V1.0-java
+    org.lineageos.platform.internal \
+    #vendor.nvidia.hardware.graphics.display-V1.0-java
 
 LOCAL_RESOURCE_DIR := \
     $(LOCAL_PATH)/res \
@@ -36,3 +40,5 @@ LOCAL_MODULE_CLASS         := ETC
 LOCAL_SRC_FILES            := permissions/privapp-permissions-lineage-displaysettings.xml
 LOCAL_MODULE_RELATIVE_PATH := permissions
 include $(BUILD_PREBUILT)
+
+endif
