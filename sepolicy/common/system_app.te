@@ -185,6 +185,10 @@ allow system_app proc_pagetypeinfo:file { read open getattr };
 allow system_app sysfs_zram:file { read open getattr };
 allow system_app sysfs_zram:dir { search open getattr };
 allow system_app apexd:binder call;
+allow system_app installd:binder call;
+allow system_app netd:binder call;
+allow system_app vold:binder call;
+
 
 # SELinux
 allow system_app { apex_service system_suspend_control_service }:service_manager find;
