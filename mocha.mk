@@ -19,9 +19,6 @@ LOCAL_PATH := device/xiaomi/mocha
 $(call inherit-product-if-exists, vendor/xiaomi/mocha/mocha-vendor.mk)
 $(call inherit-product-if-exists, vendor/xiaomi/mocha/consolemode-blobs.mk)
 
-# APEX
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/ld.config.txt:$(TARGET_COPY_OUT_SYSTEM)/etc/swcodec/ld.config.txt
 
 # APN
 PRODUCT_COPY_FILES += \
