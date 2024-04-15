@@ -276,11 +276,6 @@
 <!-- Software blur is too slow on this device. -->
     <bool name="config_sf_slowBlur">true</bool>
 
-        <!-- The list of components which should be automatically disabled for a specific device. -->
-    <string-array name="config_deviceDisabledComponents" translatable="false">
-                       
-    </string-array>
-   
  <!-- AOSP WFD -->
     <bool name="config_enableWifiDisplay">true</bool>
 
