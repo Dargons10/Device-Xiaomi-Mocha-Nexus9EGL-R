@@ -126,9 +126,6 @@ PRODUCT_PACKAGES += \
     libshim_zw \
     libshim_atomic
 
-# Use GO
-$(call inherit-product, $(SRC_TARGET_DIR)/product/go_defaults.mk)
-
 # HIDL
 PRODUCT_PACKAGES += \
     android.hidl.base@1.0 \
