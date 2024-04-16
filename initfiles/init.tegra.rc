@@ -232,3 +232,20 @@ import /vendor/etc/init/hw/init.ussrd.rc
 service watchdogd /system/watchdogd 10 110
     class core
     seclabel u:r:watchdogd:s0
+
+#Logcat in cache folder while is in bootanimation
+service logger /system/bin/logcat -b all -D -f /cache/boot_log.txt
+    class main
+    user root
+    group root system
+    disabled
+    oneshot
+
+on post-fs-data
+    # Clear existing log and start the service
+    rm /cache/boot_log.txt
+    start logger
+
+on property:sys.boot_completed=1
+    # Stop the logger service
+    stop logger
