@@ -1,5 +1,5 @@
 diff --git a/libm/libm.map.txt b/libm/libm.map.txt
-index a931b933b..71f53bd43 100644
+index a931b933b..1b9675c54 100644
 --- a/libm/libm.map.txt
 +++ b/libm/libm.map.txt
 @@ -294,7 +294,7 @@ LIBC_O { # introduced=O
@@ -7,7 +7,7 @@ index a931b933b..71f53bd43 100644
  } LIBC;
  
 -LIBC_DEPRECATED { # arm platform-only
-+LIBC_PRIVATE { # arm 
++LIBC_DEPRECATED { # arm 
    global: # arm
      __aeabi_d2lz; # arm
      __aeabi_d2ulz; # arm
