@@ -93,7 +93,9 @@
 /sys/devices/platform/host1x gk20a.0/elcg_enable 0664 system system
 /sys/devices/platform/host1x gk20a.0/elpg_enable 0664 system system
 /sys/devices/platform/host1x gk20a.0/blcg_enable 0664 system system
-/sys/devices/platform/host1x tegradc.0/enable 0664 system system
+/sys/devices/platform/host1x/tegradc.0/color_filter_rgb 0660 system system
+/sys/devices/platform/host1x/tegradc.0/color_filter 0660 system system
+/sys/devices/platform/host1x/tegradc.0/color_filter_rgb 0660 system system
 /dev/iio:device*	0660	system	system
 /sys/devices/platform/tegra12-i2c.0/i2c-0/0-00*	enable	0660	system	system
 /sys/devices/platform/tegra12-i2c.0/i2c-0/0-00*	buffer/enable	0660	system	system
