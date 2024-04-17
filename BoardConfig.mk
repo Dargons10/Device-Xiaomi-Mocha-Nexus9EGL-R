@@ -102,7 +102,7 @@ VSYNC_EVENT_PHASE_OFFSET_NS := 7500000
 #DEVICE_FRAMEWORK_MANIFEST_FILE := system/libhidl/vintfdata/manifest_healthd_exclude.xml
 
 # Gralloc
-TARGET_ADDITIONAL_GRALLOC_10_USAGE_BITS := 0x02000000U
+#TARGET_ADDITIONAL_GRALLOC_10_USAGE_BITS := 0x2000U | 0x02000000U
 
 # HIDL Manifest
 DEVICE_MANIFEST_FILE := $(LOCAL_PATH)/manifest.xml
@@ -116,7 +116,7 @@ EXTENDED_FONT_FOOTPRINT := true
 
 # Vendor Init
 TARGET_INIT_VENDOR_LIB      := libinit_mocha
-TARGET_LIBINIT_DEFINES_FILE := $(DEVICE_PATH)/libmocha/init_mocha.cpp
+TARGET_LIBINIT_DEFINES_FILE := $(LOCAL_PATH)/libmocha/init_mocha.cpp
 
 # Kernel
 BOARD_KERNEL_CMDLINE := vpr_resize androidboot.selinux=permissive vmalloc=400M
@@ -131,9 +131,9 @@ BOARD_KERNEL_SEPARATED_DT := true
 BOARD_MKBOOTIMG_ARGS := --ramdisk_offset $(BOARD_RAMDISK_OFFSET) --tags_offset $(BOARD_KERNEL_TAGS_OFFSET)
 BOARD_CUSTOM_BOOTIMG_MK := $(LOCAL_PATH)/mkbootimg.mk
 #BOARD_SYSTEMIMAGE_PARTITION_SIZE := 671088640 # 640 Mb stock partition table
-BOARD_SYSTEMIMAGE_PARTITION_SIZE := 1337564160 # 1.2 Gb
-BOARD_USERDATAIMAGE_PARTITION_SIZE := 13742637056
-BOARD_CACHEIMAGE_PARTITION_SIZE := 402653184
+BOARD_SYSTEMIMAGE_PARTITION_SIZE := 3001024512 # 2.8 Gb
+BOARD_USERDATAIMAGE_PARTITION_SIZE := 11196694528
+BOARD_CACHEIMAGE_PARTITION_SIZE := 387973120
 BOARD_BOOTIMAGE_PARTITION_SIZE := 20971520
 BOARD_PERSISTIMAGE_PARTITION_SIZE := 16777216
 BOARD_RECOVERYIMAGE_PARTITION_SIZE := 20971520
@@ -201,13 +201,14 @@ BOARD_HOSTAPD_DRIVER             := NL80211
 BOARD_HOSTAPD_PRIVATE_LIB        := lib_driver_cmd_bcmdhd
 WIFI_DRIVER_FW_PATH_STA          := "/vendor/firmware/fw_bcmdhd.bin"
 WIFI_DRIVER_FW_PATH_AP           := "/vendor/firmware/fw_bcmdhd_apsta.bin"
+WIFI_DRIVER_FW_PATH_P2P          := "/vendor/firmware/fw_bcmdhd.bin"
 WIFI_DRIVER_FW_PATH_PARAM        := "/sys/module/bcmdhd/parameters/firmware_path"
 #WIFI_DRIVER_MODULE_ARG           := "iface_name=wlan0"
 #WIFI_DRIVER_MODULE_NAME          := "bcmdhd"
 WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
 
 # workaround for devices that uses old GPU blobs
-BOARD_EGL_WORKAROUND_BUG_10194508 := true
+#BOARD_EGL_WORKAROUND_BUG_10194508 := true
                        
 # Zygote whitelist extra paths
 ZYGOTE_WHITELIST_PATH_EXTRA := \"/dev/nvhost-ctrl\",\"/dev/nvmap\",
