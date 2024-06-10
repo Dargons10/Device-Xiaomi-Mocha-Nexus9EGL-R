@@ -1,0 +1,1 @@
+allow system_app hal_graphics_display_hwservice:hwservice_manager find;
