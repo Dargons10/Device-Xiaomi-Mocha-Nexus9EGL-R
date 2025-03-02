@@ -22,11 +22,11 @@ LOCAL_PATH := device/xiaomi/mocha
 BUILD_BROKEN_DUP_RULES := true
 
 # Audio
+USE_XML_AUDIO_POLICY_CONF := 1
 USE_CUSTOM_AUDIO_POLICY  := 1
 BOARD_USES_GENERIC_AUDIO := false
 BOARD_USES_ALSA_AUDIO := true
 BOARD_USES_TINYHAL_AUDIO := true
-TARGET_LD_SHIM_LIBS := /system/vendor/lib/hw/audio.primary.vendor.tegra.so|libmocha_audio.so
 
 # Architecture
 TARGET_CPU_ABI := armeabi-v7a
