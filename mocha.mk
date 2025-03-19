@@ -336,7 +336,7 @@ PRODUCT_PACKAGES += \
 
 # USB HAL
 PRODUCT_PACKAGES += \
-    android.hardware.usb@1.0-service.basic
+    android.hardware.usb@1.0-service
 
 # Use legacy ADB USB support
 PRODUCT_PROPERTY_OVERRIDES += \
