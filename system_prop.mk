@@ -6,11 +6,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
   persist.sys.root_access=2 \
   ro.secure=0 \
   ro.adb.secure=0 \
-  ro.debuggable = 1 \
-
-# API
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.product.first_api_level=23
+  ro.debuggable = 1
 
 # AptX
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -34,18 +30,23 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 #DIDIM
 PRODUCT_PROPERTY_OVERRIDES += \
-persist.tegra.didim.enable = 1 \
-persist.tegra.didim.video = 5 \
-persist.tegra.didim.normal = 3 \
+   persist.tegra.didim.enable = 1 \
+   persist.tegra.didim.video = 5 \
+   persist.tegra.didim.normal = 3
 
 # DRM
 PRODUCT_PROPERTY_OVERRIDES += \
     drm.service.enabled=true
 
+# fastbootd
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.fastbootd.available=true
+
+
 # Graphics
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.opengles.version=196610\
-    ro.sf.lcd_density=320 \
+    ro.sf.lcd_density=326 \
     persist.tegra.compositor=surfaceflinger \
     persist.tegra.decompression=cde-client \
     ro.surface_flinger.use_frame_rate_api=false \
@@ -62,42 +63,41 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.surface_flinger.max_frame_buffer_acquired_buffers=2 \
     debug.sf.disable_hwc=1
 
-
 # Lineage genuine
 PRODUCT_PROPERTY_OVERRIDES += \
     persist.lineage.nofool=true
 
 # LMKD options
 PRODUCT_PROPERTY_OVERRIDES += \
- ro.lmk.low=1001 \
- ro.lmk.medium=800  \
- ro.lmk.critical=0 \
- ro.lmk.critical_upgrade=false \
- ro.lmk.upgrade_pressure=100 \
- ro.lmk.downgrade_pressure=100 \
- ro.lmk.kill_heaviest_task=true \
- ro.lmk.kill_timeout_ms=100 \
- ro.lmk.use_minfree_levels=tru \
+   ro.lmk.low=1001 \
+   ro.lmk.medium=800  \
+   ro.lmk.critical=0 \
+   ro.lmk.critical_upgrade=false \
+   ro.lmk.upgrade_pressure=100 \
+   ro.lmk.downgrade_pressure=100 \
+   ro.lmk.kill_heaviest_task=true \
+   ro.lmk.kill_timeout_ms=100 \
+   ro.lmk.use_minfree_levels=true
 
 # OMX
 PRODUCT_PROPERTY_OVERRIDES += \
-    persist.media.treble_omx=false
+   persist.media.treble_omx=false
 
 # PBC
 PRODUCT_PROPERTY_OVERRIDES += \
-pbc.enabled=0 \
-pbc.log=0 \
-pbc.board_power_threshold=20000 \
-pbc.low_polling_freq_threshold=1000 \
-pbc.rails=cpu,core,dram,gpu \
-pbc.cpu.power=/sys/bus/i2c/devices/7-0045/power1_input \
-pbc.cpu.cap=/dev/cpu_freq_max \
-pbc.cpu.cap.af=/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies \
-pbc.core.power=/sys/bus/i2c/devices/7-0043/power1_input \
-pbc.dram.power=/sys/bus/i2c/devices/7-0049/power1_input \
-pbc.gpu.power=/sys/bus/i2c/devices/7-004b/power1_input \
-pbc.gpu.cap=/dev/gpu_freq_max \
-pbc.gpu.cap.af=/sys/devices/platform/host1x/gk20a.0/devfreq/gk20a.0/available_frequencies
+  pbc.enabled=0 \
+  pbc.log=0 \
+  pbc.board_power_threshold=20000 \
+  pbc.low_polling_freq_threshold=1000 \
+  pbc.rails=cpu,core,dram,gpu \
+  pbc.cpu.power=/sys/bus/i2c/devices/7-0045/power1_input \
+  pbc.cpu.cap=/dev/cpu_freq_max \
+  pbc.cpu.cap.af=/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies \
+  pbc.core.power=/sys/bus/i2c/devices/7-0043/power1_input \
+  pbc.dram.power=/sys/bus/i2c/devices/7-0049/power1_input \
+  pbc.gpu.power=/sys/bus/i2c/devices/7-004b/power1_input \
+  pbc.gpu.cap=/dev/gpu_freq_max \
+  pbc.gpu.cap.af=/sys/devices/platform/host1x/gk20a.0/devfreq/gk20a.0/available_frequencies
 
 # Radio
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -115,10 +115,3 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.tegra.nvmmlite = 1 \
     persist.wlan.ti.calibrated = 0
 
-# Vendor Patch Level
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.vendor.build.security_patch=2018-01-05
-
-# fastbootd
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.fastbootd.available=true
