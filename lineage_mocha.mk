@@ -3,8 +3,8 @@ $(call inherit-product, device/xiaomi/mocha/full_mocha.mk)
 
 # Boot Animtion
 TARGET_BOOTANIMATION_HALF_RES := true
-# Inherit some common aosp stuff.
-$(call inherit-product, vendor/aosp/config/common_full_tablet_wifionly.mk)
+# Inherit some common lineage stuff.
+$(call inherit-product, vendor/lineage/config/common_full_tablet_wifionly.mk)
 
 
 TARGET_GAPPS_ARCH := arm
