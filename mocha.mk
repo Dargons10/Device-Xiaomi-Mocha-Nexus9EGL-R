@@ -335,7 +335,9 @@ PRODUCT_SOONG_NAMESPACES += device/xiaomi/mocha
 
 # Thermal
 PRODUCT_PACKAGES += \
-   thermalhal.tn8.xml
+    android.hardware.thermal@1.0-impl \
+    android.hardware.thermal@1.0-service \
+    thermal.tn8.xml
 
 # TimeKeep
 PRODUCT_PACKAGES += \
