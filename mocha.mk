@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+$(call inherit-product, $(SRC_TARGET_DIR)/product/languages_full.mk)
 LOCAL_PATH := device/xiaomi/mocha
 
 $(call inherit-product-if-exists, vendor/xiaomi/mocha/mocha-vendor.mk)
