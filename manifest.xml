@@ -20,15 +20,24 @@
         <fqname>@6.0::IEffectsFactory/default</fqname>
         </hal>
 <hal format="hidl">
-    <name>android.hardware.bluetooth</name>
-    <transport>hwbinder</transport>
-        <version>1.0</version>
+        <name>android.hardware.bluetooth</name>
+        <transport arch="32">passthrough</transport>
+        <version>1.1</version>
         <interface>
             <name>IBluetoothHci</name>
             <instance>default</instance>
         </interface>
     </hal>
-    <hal format="hidl">
+<hal format="hidl">
+        <name>android.hardware.bluetooth.a2dp</name>
+        <transport>hwbinder</transport>
+        <version>1.1</version>
+        <interface>
+            <name>IBluetoothAudioOffload/</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+<hal format="hidl">
         <name>android.hardware.broadcastradio</name>
         <transport>hwbinder</transport>
         <version>1.0</version>
@@ -136,6 +145,15 @@
         <version>1.0</version>
         <interface>
             <name>IDevice</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="hidl">
+        <name>android.hardware.thermal</name>
+        <transport arch="32">passthrough</transport>
+        <version>1.0</version>
+        <interface>
+            <name>IAllocator</name>
             <instance>default</instance>
         </interface>
     </hal>
