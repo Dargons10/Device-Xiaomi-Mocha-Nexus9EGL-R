@@ -16,12 +16,10 @@ LOCAL_USE_AAPT2 := true
 LOCAL_STATIC_ANDROID_LIBRARIES := \
     androidx.core_core \
     androidx.preference_preference \
-    androidx.leanback_leanback \
-    androidx.leanback_leanback-preference
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
     org.lineageos.platform.internal \
-    #vendor.nvidia.hardware.graphics.display-V1.0-java
+    vendor.nvidia.hardware.graphics.display-V1.0-java
 
 LOCAL_RESOURCE_DIR := \
     $(LOCAL_PATH)/res \
