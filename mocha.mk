@@ -111,7 +111,7 @@ PRODUCT_PACKAGES += \
 
 # Doze
 PRODUCT_PACKAGES += \
-    XiaomiDoze
+    XiaomiParts
 
 # fastbootd
 PRODUCT_PACKAGES += \
