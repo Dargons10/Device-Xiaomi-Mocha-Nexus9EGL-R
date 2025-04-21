@@ -150,6 +150,9 @@ PRODUCT_PACKAGES += \
     libshim_zw \
     libshim_atomic
 
+#GO
+$(call inherit-product, device/xiaomi/mocha/go_mocha.mk)
+
 # Health HAL
 PRODUCT_PACKAGES += \
     android.hardware.health@2.0-impl \
@@ -209,8 +212,7 @@ PRODUCT_COPY_FILES += \
 
 # Memtrack
 PRODUCT_PACKAGES += \
-    android.hardware.memtrack@1.0-impl \
-    android.hardware.memtrack@1.0-service    
+    android.hardware.memtrack@1.0-service-nvidia  
 
 # Memory Optimizations
 PRODUCT_PROPERTY_OVERRIDES += \
