@@ -286,7 +286,7 @@ PRODUCT_CHARACTERISTICS := tablet
 
 # PHS
 PRODUCT_PACKAGES += \
-    nvphsd.conf
+    nvphsd.tn8.conf
 
 # Power
 PRODUCT_PACKAGES += \
