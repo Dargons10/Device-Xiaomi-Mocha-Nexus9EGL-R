@@ -151,7 +151,7 @@ PRODUCT_PACKAGES += \
     libshim_atomic
 
 #GO
-$(call inherit-product, device/xiaomi/mocha/go_mocha.mk)
+#$(call inherit-product, device/xiaomi/mocha/go_mocha.mk)
 
 # Health HAL
 PRODUCT_PACKAGES += \
