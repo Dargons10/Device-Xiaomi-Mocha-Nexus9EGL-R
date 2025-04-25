@@ -48,7 +48,7 @@
 
 <AudioConfigs>
   <alsa_device name="music"
-               card_id="-1"
+               card_id="1"
                card_name="tegrart5671"
                device_id="0">
     <pcm_config rate="48000"
@@ -404,7 +404,7 @@
   </alsa_device>
 
   <alsa_device name ="aux"
-             card_id="-1"
+             card_id="0"
              card_name="Tegra"
              device_id="3">
     <pcm_config rate="48000"
