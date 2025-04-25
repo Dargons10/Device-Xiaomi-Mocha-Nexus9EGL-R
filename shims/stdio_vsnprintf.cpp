@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 
-#include <log/log.h>
+#include <cutils/log.h>
 
 static typeof(vsnprintf) *vsnprintf_real = NULL;
 
