@@ -1,4 +1,4 @@
-#ADB
+# ADB
 PRODUCT_PROPERTY_OVERRIDES += \
   persist.service.adb.enable=1 \
   persist.service.debuggable=1 \
@@ -28,7 +28,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     dalvik.vm.heapminfree=2m \
     dalvik.vm.heapmaxfree=8m
 
-#DIDIM
+# DIDIM
 PRODUCT_PROPERTY_OVERRIDES += \
    persist.tegra.didim.enable = 1 \
    persist.tegra.didim.video = 5 \
@@ -45,8 +45,8 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Graphics
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.opengles.version=196610\
-    ro.sf.lcd_density=326 \
+    ro.opengles.version=196610 \
+    ro.sf.lcd_density=320 \
     persist.tegra.compositor=surfaceflinger \
     persist.tegra.decompression=cde-client \
     ro.surface_flinger.use_frame_rate_api=false \
