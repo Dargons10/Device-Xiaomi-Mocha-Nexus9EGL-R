@@ -292,9 +292,7 @@ PRODUCT_PACKAGES += \
     fstab.tn8 \
     init.cal.rc \
     init.comms.rc \
-    init.icera.rc \
     init.hdcp.rc \
-    init.ray_touch.rc \
     init.t124.rc \
     init.tegra.rc \
     init.tlk.rc \
@@ -307,8 +305,7 @@ PRODUCT_PACKAGES += \
     ueventd.tn8.rc \
     ussrd.conf \
     init.nvgpu_shims.rc \
-    ussr_setup \
-    wireguard.rc
+    ussr_setup 
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh
