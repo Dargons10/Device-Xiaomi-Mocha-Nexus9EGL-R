@@ -298,11 +298,7 @@ PRODUCT_PACKAGES += \
     init.tn8_common.rc \
     init.ussrd.rc \
     power.tn8.rc \
-    power.mocha.rc \
-    ueventd.tn8.rc \
-    ussrd.conf \
-    init.nvgpu_shims.rc \
-    ussr_setup \
+    ueventd.tn8.rc 
   
 
 PRODUCT_COPY_FILES += \
