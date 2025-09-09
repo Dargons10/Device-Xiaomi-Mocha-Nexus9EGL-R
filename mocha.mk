@@ -186,7 +186,7 @@ PRODUCT_PACKAGES += \
     android.hardware.light@2.0-service.mocha
 
 # LiveDisplay
-#    PRODUCT_PACKAGES += vendor.lineage.livedisplay@2.0-service-sysfs
+   PRODUCT_PACKAGES += vendor.lineage.livedisplay@2.0-service-nvidia
 
 # Media_omx config
 PRODUCT_PACKAGES += \
