@@ -125,6 +125,12 @@ PRODUCT_PACKAGES += \
 #PRODUCT_PACKAGES += \
 #    android.hardware.broadcastradio@1.0-impl
 
+# Gatekeeper
+PRODUCT_PACKAGES += \
+    android.hardware.gatekeeper@1.0-impl \
+    android.hardware.gatekeeper@1.0-service \
+    gatekeeper.tegra
+
 # Graphics
 PRODUCT_AAPT_CONFIG += xlarge large
 TARGET_SCREEN_HEIGHT := 2048
