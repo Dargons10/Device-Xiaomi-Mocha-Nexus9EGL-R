@@ -20,21 +20,20 @@
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.config.low_ram=true \
     persist.traced.enable=1
-
-# LMK settings (less aggressive for 2GB RAM)
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.lmk.critical_upgrade=true \
-    ro.lmk.upgrade_pressure=50 \
-    ro.lmk.downgrade_pressure=70 \
-    ro.lmk.medium=800 \
-    ro.lmk.kill_heaviest_task=false \
     ro.statsd.enable=true
 
 # Heap sizes (adjusted for 2GB RAM)
 PRODUCT_PROPERTY_OVERRIDES += \
+     dalvik.vm.heapstartsize=16m \
     dalvik.vm.heapgrowthlimit=192m \
     dalvik.vm.heapsize=384m \
-    dalvik.vm.madvise-random=true
+    dalvik.vm.heaptargetutilization=0.75 \
+    dalvik.vm.heapminfree=2m \
+    dalvik.vm.heapmaxfree=8m \
+    ro.lmk.upgrade_pressure=50 \
+    ro.lmk.downgrade_pressure=70 \
+    ro.lmk.critical_upgrade=true \
+    ro.lmk.kill_heaviest_task=false
 
 # Compiler and optimization settings
 PRODUCT_SYSTEM_SERVER_COMPILER_FILTER := speed-profile
