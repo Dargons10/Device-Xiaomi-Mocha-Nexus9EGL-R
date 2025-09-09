@@ -79,13 +79,13 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := init/hw
 include $(BUILD_PREBUILT)
 
-#include $(CLEAR_VARS)
-#LOCAL_MODULE       := init.ussrd.rc
-#LOCAL_MODULE_CLASS := ETC
-#LOCAL_SRC_FILES    := init.ussrd.rc
-#LOCAL_VENDOR_MODULE := true
-#LOCAL_MODULE_RELATIVE_PATH := init/hw
-#include $(BUILD_PREBUILT)
+include $(CLEAR_VARS)
+LOCAL_MODULE       := init.ussrd.rc
+LOCAL_MODULE_CLASS := ETC
+LOCAL_SRC_FILES    := init.ussrd.rc
+LOCAL_VENDOR_MODULE := true
+LOCAL_MODULE_RELATIVE_PATH := init/hw
+include $(BUILD_PREBUILT)
 
 #include $(CLEAR_VARS)
 #LOCAL_MODULE       := power.mocha.rc

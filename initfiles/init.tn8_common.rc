@@ -41,6 +41,15 @@ on boot
     #enable Miracast game mode support
     setprop nvwfd.gamemode 1
 
+    # add a cpuset for the camera daemon
+    # we want all the little cores for camera
+    mkdir /dev/cpuset/camera-daemon
+    write /dev/cpuset/camera-daemon/cpus 0
+    write /dev/cpuset/camera-daemon/mems 0
+    chown system system /dev/cpuset/camera-daemon
+    chown system system /dev/cpuset/camera-daemon/tasks
+    chmod 0664 /dev/cpuset/camera-daemon/tasks
+
 on init
      setprop ro.feature.stylus 1
     setprop persist.tegra.cursor.enable 1
