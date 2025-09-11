@@ -97,8 +97,3 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ap.interface=wlan0 \
     persist.tegra.nvmmlite = 1 \
     persist.wlan.ti.calibrated = 0
-
-
-
-
-
