@@ -3,7 +3,7 @@
 hidl_interface {
     name: "vendor.nvidia.hardware.graphics.composer@2.0",
     root: "vendor.nvidia.hardware",
-    product_specific: true,
+    system_ext_specific: true,
     srcs: [
         "INvComposer.hal",
         "INvComposerCallback.hal",
@@ -18,4 +18,3 @@ hidl_interface {
     ],
     gen_java: false,
 }
-

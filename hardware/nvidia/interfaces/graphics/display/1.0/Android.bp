@@ -3,7 +3,7 @@
 hidl_interface {
     name: "vendor.nvidia.hardware.graphics.display@1.0",
     root: "vendor.nvidia.hardware",
-    product_specific: true,
+    system_ext_specific: true,
     srcs: [
         "types.hal",
         "INvDeepISPCallback.hal",
@@ -14,4 +14,3 @@ hidl_interface {
     ],
     gen_java: true,
 }
-
