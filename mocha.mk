@@ -167,8 +167,9 @@ PRODUCT_PACKAGES += \
     libhwbinder
 
 # HIDL Manifest
-PRODUCT_COPY_FILES += \
+vintf_fragments += \
     $(LOCAL_PATH)/manifest.xml:system/vendor/manifest.xml
+    
 
 # Key layouts
 PRODUCT_PACKAGES += \
