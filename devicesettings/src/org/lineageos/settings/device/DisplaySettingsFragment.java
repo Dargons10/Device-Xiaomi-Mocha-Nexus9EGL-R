@@ -16,9 +16,11 @@
 
 package org.lineageos.settings.device;
 
-import android.app.ActionBar;
+import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.RemoteException;
@@ -28,7 +30,7 @@ import android.view.MenuItem;
 import android.app.AlertDialog;
 import androidx.preference.ListPreference;
 import androidx.preference.PreferenceCategory;
-import androidx.preference.PreferenceFragment;
+import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
 import androidx.preference.SwitchPreference;
@@ -37,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.NoSuchElementException;
 
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplay;
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplayMode;
@@ -44,7 +47,7 @@ import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplayType;
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcModeType;
 import vendor.nvidia.hardware.graphics.display.V1_0.INvDisplay;
 
-public class DisplaySettingsFragment extends PreferenceFragment
+public class DisplaySettingsFragment extends PreferenceFragmentCompat
         implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = DisplaySettingsFragment.class.getSimpleName();
@@ -56,24 +59,14 @@ public class DisplaySettingsFragment extends PreferenceFragment
         try {
             mDisplayService = INvDisplay.getService(true /* retry */);
         } catch (RemoteException e) {
+        } catch (NoSuchElementException e) {
         }
 
         addPreferencesFromResource(R.xml.display_panel);
         PreferenceScreen preferenceScreen = this.getPreferenceScreen();
 
-        for (int i = HwcSvcDisplay.HWC_SVC_DISPLAY_PANEL; i <= HwcSvcDisplay.HWC_SVC_DISPLAY_HDMI2; i++) {
-            PreferenceCategory category = new PreferenceCategory(preferenceScreen.getContext());
-
-            if (!initializeDisplayCategory(category, i))
-                continue;
-
-            preferenceScreen.addPreference(category);
-            populateDisplayCategory(category, i);
-
-        }
-
-        final ActionBar actionBar = getActivity().getActionBar();
-        actionBar.setDisplayHomeAsUpEnabled(true);
+        if (mDisplayService != null)
+            createDisplaySettings(preferenceScreen);
     }
 
     @Override
@@ -101,10 +94,9 @@ public class DisplaySettingsFragment extends PreferenceFragment
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPrefs, String key) {
-        HashMap<String, Integer> uidMap = DisplayUtils.makeUidMap(mDisplayService);
         if (key.startsWith("mode_")) {
             String hash = key.substring(5);
-            int display = uidMap.getOrDefault(hash, -1);
+            int display = DisplayUtils.makeUidMap(mDisplayService).getOrDefault(hash, -1);
 
             if (display >= 0) {
                 int modeIndex = Integer.valueOf(sharedPrefs.getString(key, ""));
@@ -192,7 +184,23 @@ public class DisplaySettingsFragment extends PreferenceFragment
         }.start();
     }
 
-    private boolean initializeDisplayCategory(PreferenceCategory category, int display) {
+    private void createDisplaySettings(PreferenceScreen preferenceScreen) {
+        for (int i = HwcSvcDisplay.HWC_SVC_DISPLAY_PANEL;
+                i <= HwcSvcDisplay.HWC_SVC_DISPLAY_HDMI2; i++) {
+            PreferenceCategory category = new PreferenceCategory(
+                                            preferenceScreen.getContext());
+
+            if (!initializeDisplayCategory(category, i))
+                continue;
+
+            preferenceScreen.addPreference(category);
+            populateDisplayCategory(category, i);
+
+        }
+    }
+
+    private boolean initializeDisplayCategory(PreferenceCategory category,
+                                                                int display) {
         try {
             int type = mDisplayService.displayGetType(display);
             ArrayList<HwcSvcDisplayMode> availableModes = mDisplayService.modeGetList(display);
@@ -266,6 +274,5 @@ public class DisplaySettingsFragment extends PreferenceFragment
         modesPreference.setValue(String.valueOf(currentMode.index));
 
         category.addPreference(modesPreference);
-
     }
 }

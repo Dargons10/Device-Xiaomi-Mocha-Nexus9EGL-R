@@ -16,12 +16,11 @@
 
 package org.lineageos.settings.device;
 
+import android.content.ContentResolver;
 import android.os.RemoteException;
+import android.provider.Settings;
 import android.util.Log;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -88,5 +87,12 @@ public class DisplayUtils {
 
         return String.format("%s %d-bit %s", encodingStr, mode.bpc, colorimetryStr);
     }
-    \
+
+    public static void setPanelBrightness(ContentResolver resolver, int brightness) {
+	Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, brightness);
+    }
+
+    public static Integer getPanelBrightness(ContentResolver resolver) {
+	return Settings.System.getInt(resolver, Settings.System.SCREEN_BRIGHTNESS, 0);
+    }
 }

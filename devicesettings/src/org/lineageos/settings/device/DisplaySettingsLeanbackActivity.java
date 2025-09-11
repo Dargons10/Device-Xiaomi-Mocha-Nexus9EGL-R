@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The LineageOS Project
+ * Copyright (C) 2023 The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,22 +22,19 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.SystemProperties;
+import android.util.Log;
 import android.view.WindowManagerPolicyConstants;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentActivity;
 
-public class DisplaySettingsActivity extends AppCompatActivity {
+public class DisplaySettingsLeanbackActivity extends FragmentActivity {
+    private final static String TAG = DisplaySettingsLeanbackActivity.class.getSimpleName();
     public final Receiver mReceiver = new Receiver();
     public boolean mExternalDisplayConnected;
 
     protected void onCreate(Bundle savedInstanceState) {
+        Log.i(TAG, "Starting " + DisplaySettingsFragmentLeanback.class.getSimpleName());
         super.onCreate(savedInstanceState);
-
-        if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .setReorderingAllowed(true)
-                    .add(android.R.id.content, DisplaySettingsFragment.class, null)
-                    .commit();
-        }
+        setContentView(R.xml.settings_fragment);
     }
 
     @Override
@@ -53,16 +50,15 @@ public class DisplaySettingsActivity extends AppCompatActivity {
     }
 
     final class Receiver extends BroadcastReceiver {
-        private boolean mReceivedInitialIntent = false;
         public boolean mBlocked;
+        private boolean mReceivedInitialIntent = false;
 
         public void init(Context context) {
+            mReceivedInitialIntent = false;
+
             // Refresh UI on external display status change
             IntentFilter filter = new IntentFilter();
-
             filter.addAction(WindowManagerPolicyConstants.ACTION_HDMI_PLUGGED);
-
-            mReceivedInitialIntent = false;
             context.registerReceiver(this, filter);
         }
 
@@ -79,6 +75,4 @@ public class DisplaySettingsActivity extends AppCompatActivity {
             mReceivedInitialIntent = true;
         }
     }
-
-    ;
 }
