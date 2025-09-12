@@ -89,22 +89,28 @@ on property:sys.boot_completed=1
     write /dev/cpuset/top-app/mems 0
 
 on init
+    chmod 0775 /vendor/bin/bt_loader.sh
+    chown root system /vendor/bin/bt_loader.sh
+    start bt_loader
+       
     # Mount a tmpfs into /mnt/tmp for hosting nvram, phs shared memory
     mkdir /mnt/tmp 0770 system system
     mount tmpfs tmpfs /mnt/tmp mode=0775,gid=1003
 
 
-# Loads real wifi and bt mac from /dev/block/platform/sdhci-tegra.3/by-name/BKB
-    service conn_wifi /vendor/bin/conn_init -op
+# Loads real wifi and bt mac from /dev/block/mmcblk0p15service conn_wifi /system/vendor/bin/conn_init -op
+    service conn_wifi /system/vendor/bin/conn_init -op
     class main
     user root
     group root
     seclabel u:r:conn_wifi:s0
     oneshot
 
-    service init-btloader-sh /system/bin/init.btloader.sh 
+service bt_loader /vendor/bin/bt_loader.sh 
     class main
     user root
-    group root system
+    group system
     disabled
     oneshot
+    seclabel u:r:bt_loader:s0
+
