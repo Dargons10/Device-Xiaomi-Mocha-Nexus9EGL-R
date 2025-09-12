@@ -3,5 +3,4 @@ subdirs = [
     "hidl",
     "tinyalsa",
     "health",
-    "gatekeeper",
-]
+   }
