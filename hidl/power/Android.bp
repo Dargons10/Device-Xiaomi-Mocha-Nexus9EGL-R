@@ -15,6 +15,7 @@ cc_binary {
     ],
 
     shared_libs: [
+        "libexpat",
         "liblog",
         "libdl",
         "libutils",

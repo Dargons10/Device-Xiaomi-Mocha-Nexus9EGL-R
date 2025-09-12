@@ -272,7 +272,6 @@ PRODUCT_PACKAGES += \
 # Power
 PRODUCT_PACKAGES += \
     android.hardware.power@1.0-service.mocha \
-    android.hardware.vendor.lineage.power@1.0-impl \
     power.tegra
 
 # Ramdisk
