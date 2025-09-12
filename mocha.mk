@@ -275,6 +275,10 @@ PRODUCT_PACKAGES += \
     android.hardware.power@1.0-service.mocha \
     power.tegra
 
+# Ship libprotobuf-cpp-lite-v29.so for fix _ZN6google8protobuf8internal13empty_string_E
+PRODUCT_COPY_FILES += \
+    prebuilts/vndk/v29/arm/arch-arm-armv7-a-neon/shared/vndk-core/libprotobuf-cpp-lite.so:$(TARGET_COPY_OUT_VENDOR)/lib/libprotobuf-cpp-lite-v29.so \
+
 # Ramdisk
 PRODUCT_PACKAGES += \
     fstab.tn8 \
