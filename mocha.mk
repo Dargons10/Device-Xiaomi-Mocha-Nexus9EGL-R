@@ -296,7 +296,6 @@ PRODUCT_PACKAGES += \
     power.mocha.rc \
     ueventd.tn8.rc \
     ussrd.conf \
-    init.nvgpu_shims.rc \
     ussr_setup 
   
 

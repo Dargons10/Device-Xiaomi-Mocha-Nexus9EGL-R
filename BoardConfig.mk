@@ -175,7 +175,8 @@ TARGET_LD_SHIM_LIBS := \
     /system/vendor/lib/libnvcap_video.so|libshim_camera.so \
     /system/vendor/lib/libnvgr.so|libshim_atomic.so \
     /system/vendor/lib/hw/camera.vendor.tegra.so|libnvomxadaptor_shim.so \
-    /system/vendor/lib/libnvomxadaptor.so|libnvomxadaptor_shim.so 
+    /system/vendor/lib/libnvomxadaptor.so|libnvomxadaptor_shim.so \
+    /system/bin/app_process32|/system/lib/libshim_zw.so \
 
 # ThermalHAL
 TARGET_THERMALHAL_VARIANT := tegra
@@ -199,6 +200,7 @@ WIFI_DRIVER_FW_PATH_P2P          := "/vendor/firmware/fw_bcmdhd.bin"
 WIFI_DRIVER_FW_PATH_PARAM        := "/sys/module/bcmdhd/parameters/firmware_path"
 #WIFI_DRIVER_MODULE_ARG           := "iface_name=wlan0"
 #WIFI_DRIVER_MODULE_NAME          := "bcmdhd"
+WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
 
 # workaround for devices that uses old GPU blobs
 #BOARD_EGL_WORKAROUND_BUG_10194508 := true
