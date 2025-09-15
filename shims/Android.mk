@@ -23,7 +23,7 @@ LOCAL_MULTILIB         := 32
 LOCAL_SHARED_LIBRARIES := libstagefright libui
 LOCAL_VENDOR_MODULE    := true
 include $(BUILD_SHARED_LIBRARY)
-
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := stdio_vsnprintf.cpp
 LOCAL_C_INCLUDES := \
