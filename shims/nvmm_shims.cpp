@@ -1,5 +1,5 @@
-/* 
-* Copyright (C) 2021 The LineageOS Project
+/*
+ * Copyright (C) 2021 The LineageOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,5 +28,3 @@ extern "C" void _ZN7android13GraphicBufferC1EP19ANativeWindowBufferb(ANativeWind
 {
     _ZN7android13GraphicBufferC1Ev();
 }
-
-

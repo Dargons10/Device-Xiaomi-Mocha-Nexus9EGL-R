@@ -137,6 +137,9 @@ JAVA_SOURCE_OVERLAYS := org.lineageos.hardware|$(LOCAL_PATH)/lineagehw|**/*.java
 # Malloc
 MALLOC_SVELTE := true
 
+# Memfd
+TARGET_HAS_MEMFD_BACKPORT := true
+
 # Offmode Charging
 BOARD_CHARGER_DISABLE_INIT_BLANK := true
 BACKLIGHT_PATH := "/sys/class/backlight/lcd-backlight/brightness"
@@ -175,16 +178,33 @@ TARGET_LD_SHIM_LIBS := \
     /system/vendor/lib/libnvcap_video.so|libshim_camera.so \
     /system/vendor/lib/libnvgr.so|libshim_atomic.so \
     /system/vendor/lib/hw/camera.vendor.tegra.so|libnvomxadaptor_shim.so \
-    /system/vendor/lib/libnvomxadaptor.so|libnvomxadaptor_shim.so \
-    /system/bin/app_process32|/system/lib/libshim_zw.so \
+    /system/vendor/lib/libnvomxadaptor.so|libnvomxadaptor_shim.so 
+
+# nvgpu shims
+TARGET_LD_SHIM_LIBS += \
+  /system/bin/app_process32|/system/lib/libshim_zw.so
+
+# liblog shims
+TARGET_LD_SHIM_LIBS += \
+  /system/vendor/lib/libnvcamlog.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvmm_camera_v3.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvcamerahdr_v3.so|/system/lib/liblog.so \
+  /system/vendor/lib/hw/camera.tegra.so|/system/lib/liblog.so \
+  /system/vendor/lib/egl/libEGL_tegra.so|/system/lib/liblog.so \
+  /system/vendor/lib/libglcore.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvgr.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvmm_utils.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvomxadaptor.so|/system/lib/liblog.so \
+  /system/vendor/lib/libnvomx.so|/system/lib/liblog.so \
+  /system/vendor/lib/libmplmpu.so|/system/lib/liblog.so
 
 # ThermalHAL
 TARGET_THERMALHAL_VARIANT := tegra
 
-#WEBGL in WebKit
+# WEBGL in WebKit
 ENABLE_WEBGL := true
 
-#Vintf
+# Vintf
 PRODUCT_ENFORCE_VINTF_MANIFEST_OVERRIDE := true
 
 # Wifi related defines
@@ -207,3 +227,6 @@ WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
                        
 # Zygote whitelist extra paths
 ZYGOTE_WHITELIST_PATH_EXTRA := \"/dev/nvhost-ctrl\",\"/dev/nvmap\",
+
+# Security patch level
+VENDOR_SECURITY_PATCH := 2022-04-05

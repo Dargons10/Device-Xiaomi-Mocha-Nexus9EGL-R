@@ -20,8 +20,8 @@ LOCAL_PATH := device/xiaomi/mocha
 $(call inherit-product-if-exists, vendor/xiaomi/mocha/mocha-vendor.mk)
 $(call inherit-product-if-exists, vendor/xiaomi/mocha/consolemode-blobs.mk)
 
-#API
-PRODUCT_PACKAGES += $(PRODUCT_PACKAGES_SHIPPING_API_LEVEL_29)
+# API
+PRODUCT_PACKAGES += $(PRODUCT_PACKAGES_SHIPPING_API_LEVEL_31)
 
 # Audio
 PRODUCT_COPY_FILES += \
@@ -51,7 +51,8 @@ PRODUCT_PACKAGES += \
     tinypcminfo_mocha \
     libtinyalsa \
     xaplay
-	
+
+# Audio configuration
 PRODUCT_COPY_FILES += \
     frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
@@ -138,6 +139,14 @@ PRODUCT_PACKAGES += \
     android.hardware.graphics.composer@2.1-service \
     android.hardware.graphics.mapper@2.0-impl \
     android.hardware.renderscript@1.0-impl \
+
+# Shims
+PRODUCT_PACKAGES += \
+    libnvomxadaptor_shim \
+    libprotobuf_shim \
+    libnvos_shim \
+    libnvmm_shim \
+    libshim_camera \
     libs \
     libshim_zw \
     libshim_atomic
@@ -199,7 +208,8 @@ PRODUCT_COPY_FILES += \
 
 # Memtrack
 PRODUCT_PACKAGES += \
-    android.hardware.memtrack@1.0-service-nvidia
+    android.hardware.memtrack@1.0-impl \
+    android.hardware.memtrack@1.0-service
 
 # NVIDIA
 PRODUCT_COPY_FILES += \
@@ -208,11 +218,12 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/permissions/com.nvidia.feature.opengl4.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/com.nvidia.feature.opengl4.xml \
     $(LOCAL_PATH)/permissions/com.nvidia.nvsi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/com.nvidia.nvsi.xml
 
-NV_ANDROID_FRAMEWORK_ENHANCEMENTS := true  
+# Enable nvidia framework enhancements if available
+-include vendor/lineage/product/nvidia.mk
 
-#OMX(SOFTWARE)
+# OMX(SOFTWARE)
 PRODUCT_PROPERTY_OVERRIDES += \
-    debug.stagefright.c2-poolmask=0x80000\
+    debug.stagefright.c2-poolmask=0x80000 \
     debug.stagefright.ccodec=0
 
 # Overlay
@@ -257,23 +268,21 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/tablet_core_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/tablet_core_hardware.xml \
     frameworks/native/data/etc/android.hardware.sensor.stepcounter.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.stepcounter.xml \
     frameworks/native/data/etc/android.hardware.sensor.stepdetector.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.stepdetector.xml \
-    frameworks/native/data/etc/android.software.freeform_window_management.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.freeform_window_management.xml\
-    frameworks/native/data/etc/android.hardware.sensor.stepcounter.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.stepcounter.xml \
-    frameworks/native/data/etc/android.hardware.sensor.stepdetector.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.stepdetector.xml \
+    frameworks/native/data/etc/android.software.freeform_window_management.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.freeform_window_management.xml \
     $(LOCAL_PATH)/permissions/privapp-permissions-google.xml:system/etc/permissions/privapp-permissions-google.xml \
     $(LOCAL_PATH)/permissions/GoogleExtServices_permissions.xml:system/etc/permissions/GoogleExtServices_permissions.xml
 
-
+# Product
 PRODUCT_CHARACTERISTICS := tablet
 
 # PHS
 PRODUCT_PACKAGES += \
-    nvphsd.tn8.conf
+    nvphsd.conf
 
 # Power
 PRODUCT_PACKAGES += \
     android.hardware.power@1.0-service.mocha \
-    power.tegra
+    vendor.lineage.power@1.0
 
 # Ship libprotobuf-cpp-lite-v29.so for fix _ZN6google8protobuf8internal13empty_string_E
 PRODUCT_COPY_FILES += \
@@ -296,9 +305,10 @@ PRODUCT_PACKAGES += \
     power.mocha.rc \
     ueventd.tn8.rc \
     ussrd.conf \
-    ussr_setup 
+    init.nvgpu_shims.rc
   
 
+# Seccomp
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh
 
@@ -343,14 +353,8 @@ PRODUCT_PACKAGES += \
 
 # Vendor seccomp policy files for media components:
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/seccomp/mediacodec.policy:$(TARGET_COPY_OUT_VENDOR)/etc/seccomp_policy/mediacodec.policy
-
-# Widevine DRM
-PRODUCT_PACKAGES += \
-    libprotobuf_shim
-
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/seccomp/mediacodec.policy:$(TARGET_COPY_OUT_VENDOR)/etc/seccomp_policy/mediacodec.policy
+    $(LOCAL_PATH)/seccomp/mediacodec.policy:$(TARGET_COPY_OUT_VENDOR)/etc/seccomp_policy/mediacodec.policy \
+    $(LOCAL_PATH)/seccomp/mediaextractor.policy:$(TARGET_COPY_OUT_VENDOR)/etc/seccomp_policy/mediaextractor.policy
 
 # Wifi
 PRODUCT_COPY_FILES += \
@@ -366,9 +370,3 @@ PRODUCT_PACKAGES += \
     conn_init \
     wpa_supplicant \
     wpa_supplicant.conf
-
-
-# Vendor security patch level
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.lineage.build.vendor_security_patch=2018-01-05 \
-    ro.vendor.build.security_patch=2018-01-05

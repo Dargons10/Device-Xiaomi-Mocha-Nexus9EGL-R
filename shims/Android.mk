@@ -7,7 +7,7 @@ $(PROTOBUF_SYMLINK):
 
 ALL_DEFAULT_INSTALLED_MODULES += $(PROTOBUF_SYMLINK)
 
-## libshim_atomic
+# libshim_atomic
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := atomic.cpp
 LOCAL_MODULE := libshim_atomic
@@ -23,6 +23,7 @@ LOCAL_MULTILIB         := 32
 LOCAL_SHARED_LIBRARIES := libstagefright libui
 LOCAL_VENDOR_MODULE    := true
 include $(BUILD_SHARED_LIBRARY)
+
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := stdio_vsnprintf.cpp
@@ -55,6 +56,7 @@ LOCAL_SHARED_LIBRARIES := libui libgui libstagefright_foundation
 LOCAL_C_INCLUDES := frameworks/native/include frameworks/av/include frameworks/av/media/ndk/include
 LOCAL_CFLAGS := -Wno-unused-private-field
 LOCAL_MODULE := libnvomxadaptor_shim
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_SHARED_LIBRARY)
 
@@ -75,4 +77,11 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MULTILIB := 32
 LOCAL_VENDOR_MODULE := true
 
+include $(BUILD_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE           := libnvos_shim
+LOCAL_SRC_FILES        := nvos_shim.cpp
+LOCAL_SHARED_LIBRARIES := libnvos
+LOCAL_VENDOR_MODULE    := true
 include $(BUILD_SHARED_LIBRARY)
