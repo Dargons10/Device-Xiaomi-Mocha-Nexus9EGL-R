@@ -1,7 +1,4 @@
 on boot
-
-    exec_start init-btloader-sh
-
 # Power management settings
     write /sys/devices/system/cpu/cpuquiet/tegra_cpuquiet/no_lp 0
 
@@ -89,6 +86,10 @@ on property:sys.boot_completed=1
     write /dev/cpuset/top-app/mems 0
 
 on init
+    chmod 0775 /vendor/bin/bt_loader.sh
+    chown root system /vendor/bin/bt_loader.sh
+    start bt_loader
+       
     # Mount a tmpfs into /mnt/tmp for hosting nvram, phs shared memory
     mkdir /mnt/tmp 0770 system system
     mount tmpfs tmpfs /mnt/tmp mode=0775,gid=1003
@@ -102,9 +103,11 @@ on init
     seclabel u:r:conn_wifi:s0
     oneshot
 
-    service init-btloader-sh /system/bin/init.btloader.sh 
+service bt_loader /vendor/bin/bt_loader.sh 
     class main
     user root
-    group root system
+    group system
     disabled
     oneshot
+    seclabel u:r:bt_loader:s0
+
