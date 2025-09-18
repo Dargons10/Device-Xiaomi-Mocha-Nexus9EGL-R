@@ -21,23 +21,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.os.SystemProperties;
+import android.preference.PreferenceActivity;
 import android.view.WindowManagerPolicyConstants;
-import androidx.appcompat.app.AppCompatActivity;
 
-public class DisplaySettingsActivity extends AppCompatActivity {
+
+public class DisplaySettingsActivity extends PreferenceActivity {
     public final Receiver mReceiver = new Receiver();
+    private DisplaySettingsFragment mFragment;
     public boolean mExternalDisplayConnected;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .setReorderingAllowed(true)
-                    .add(android.R.id.content, DisplaySettingsFragment.class, null)
-                    .commit();
-        }
+        mFragment = new DisplaySettingsFragment();
+
+        getFragmentManager().beginTransaction().replace(android.R.id.content, mFragment).commit();
     }
 
     @Override
@@ -46,7 +44,6 @@ public class DisplaySettingsActivity extends AppCompatActivity {
         unregisterReceiver(mReceiver);
     }
 
-    @Override
     protected void onResume() {
         super.onResume();
         mReceiver.init(this);
@@ -67,8 +64,7 @@ public class DisplaySettingsActivity extends AppCompatActivity {
         }
 
         public void onReceive(Context context, Intent intent) {
-            mExternalDisplayConnected = intent.getBooleanExtra(
-                    WindowManagerPolicyConstants.EXTRA_HDMI_PLUGGED_STATE, false);
+            mExternalDisplayConnected = intent.getBooleanExtra(WindowManagerPolicyConstants.EXTRA_HDMI_PLUGGED_STATE, false);
 
             if (mBlocked)
                 return;

@@ -16,11 +16,9 @@
 
 package org.lineageos.settings.device;
 
-import android.app.AlertDialog;
+import android.app.ActionBar;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
-import android.content.res.Resources;
-import android.content.Intent;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.RemoteException;
@@ -30,7 +28,7 @@ import android.view.MenuItem;
 import android.app.AlertDialog;
 import androidx.preference.ListPreference;
 import androidx.preference.PreferenceCategory;
-import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceFragment;
 import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
 import androidx.preference.SwitchPreference;
@@ -39,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.NoSuchElementException;
 
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplay;
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplayMode;
@@ -47,7 +44,7 @@ import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcDisplayType;
 import vendor.nvidia.hardware.graphics.display.V1_0.HwcSvcModeType;
 import vendor.nvidia.hardware.graphics.display.V1_0.INvDisplay;
 
-public class DisplaySettingsFragment extends PreferenceFragmentCompat
+public class DisplaySettingsFragment extends PreferenceFragment
         implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = DisplaySettingsFragment.class.getSimpleName();
@@ -59,14 +56,24 @@ public class DisplaySettingsFragment extends PreferenceFragmentCompat
         try {
             mDisplayService = INvDisplay.getService(true /* retry */);
         } catch (RemoteException e) {
-        } catch (NoSuchElementException e) {
         }
 
         addPreferencesFromResource(R.xml.display_panel);
         PreferenceScreen preferenceScreen = this.getPreferenceScreen();
 
-        if (mDisplayService != null)
-            createDisplaySettings(preferenceScreen);
+        for (int i = HwcSvcDisplay.HWC_SVC_DISPLAY_PANEL; i <= HwcSvcDisplay.HWC_SVC_DISPLAY_HDMI2; i++) {
+            PreferenceCategory category = new PreferenceCategory(preferenceScreen.getContext());
+
+            if (!initializeDisplayCategory(category, i))
+                continue;
+
+            preferenceScreen.addPreference(category);
+            populateDisplayCategory(category, i);
+
+        }
+
+        final ActionBar actionBar = getActivity().getActionBar();
+        actionBar.setDisplayHomeAsUpEnabled(true);
     }
 
     @Override
@@ -94,9 +101,10 @@ public class DisplaySettingsFragment extends PreferenceFragmentCompat
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPrefs, String key) {
+        HashMap<String, Integer> uidMap = DisplayUtils.makeUidMap(mDisplayService);
         if (key.startsWith("mode_")) {
             String hash = key.substring(5);
-            int display = DisplayUtils.makeUidMap(mDisplayService).getOrDefault(hash, -1);
+            int display = uidMap.getOrDefault(hash, -1);
 
             if (display >= 0) {
                 int modeIndex = Integer.valueOf(sharedPrefs.getString(key, ""));
@@ -104,6 +112,11 @@ public class DisplaySettingsFragment extends PreferenceFragmentCompat
                 performModeChange(sharedPrefs, key, modeIndex, display);
             }
 
+            return;
+        }
+
+        if (key.equals("disable_internal_on_external_connected")) {
+            DisplayUtils.setInternalDisplayState(!(((DisplaySettingsActivity)getActivity()).mExternalDisplayConnected && sharedPrefs.getBoolean(key, false)));
             return;
         }
     }
@@ -184,23 +197,7 @@ public class DisplaySettingsFragment extends PreferenceFragmentCompat
         }.start();
     }
 
-    private void createDisplaySettings(PreferenceScreen preferenceScreen) {
-        for (int i = HwcSvcDisplay.HWC_SVC_DISPLAY_PANEL;
-                i <= HwcSvcDisplay.HWC_SVC_DISPLAY_HDMI2; i++) {
-            PreferenceCategory category = new PreferenceCategory(
-                                            preferenceScreen.getContext());
-
-            if (!initializeDisplayCategory(category, i))
-                continue;
-
-            preferenceScreen.addPreference(category);
-            populateDisplayCategory(category, i);
-
-        }
-    }
-
-    private boolean initializeDisplayCategory(PreferenceCategory category,
-                                                                int display) {
+    private boolean initializeDisplayCategory(PreferenceCategory category, int display) {
         try {
             int type = mDisplayService.displayGetType(display);
             ArrayList<HwcSvcDisplayMode> availableModes = mDisplayService.modeGetList(display);
@@ -274,5 +271,16 @@ public class DisplaySettingsFragment extends PreferenceFragmentCompat
         modesPreference.setValue(String.valueOf(currentMode.index));
 
         category.addPreference(modesPreference);
+
+        // Show checkbox to disable internal panel when an external display is connected
+        if (display == HwcSvcDisplay.HWC_SVC_DISPLAY_PANEL) {
+            SwitchPreference disableInternalOnExternalConnectedPreference = new SwitchPreference(category.getContext());
+            disableInternalOnExternalConnectedPreference.setTitle(R.string.disable_internal_on_external_connected_title);
+            disableInternalOnExternalConnectedPreference.setSummaryOn(R.string.disable_internal_on_external_connected_summary_on);
+            disableInternalOnExternalConnectedPreference.setSummaryOff(R.string.disable_internal_on_external_connected_summary_off);
+            disableInternalOnExternalConnectedPreference.setKey("disable_internal_on_external_connected");
+
+            category.addPreference(disableInternalOnExternalConnectedPreference);
+        }
     }
 }
