@@ -1,4 +1,7 @@
 # Inherit device configuration for mocha.
+# Boot Animtion
+TARGET_BOOTANIMATION_HALF_RES := true
+
 # Inherit some common lineage stuff.
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/languages_full.mk)
