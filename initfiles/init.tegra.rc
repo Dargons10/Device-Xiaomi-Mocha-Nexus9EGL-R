@@ -16,6 +16,9 @@ on init
     mkdir /mnt/media_rw/sdcard1 0700 media_rw media_rw
     mkdir /storage/sdcard1 0700 root sdcard_r
     
+    # Mount and bind audio_policy_configuration.xml in /vendor
+    mount none /system/etc/audio_policy_configuration.xml /vendor/etc/audio/audio_policy_configuration.xml bind
+
     # Support legacy paths
     symlink /sdcard /mnt/sdcard
     #symlink /sdcard /storage/sdcard0
