@@ -89,9 +89,6 @@ PRODUCT_PACKAGES += \
 #    libmocha_omx \
 #    libpowerservice_client \
 #    libmocha_libc
-# Camera
-PRODUCT_PACKAGES += \
-    libshim_camera
 
 # Comm Permissions
 PRODUCT_COPY_FILES += \
