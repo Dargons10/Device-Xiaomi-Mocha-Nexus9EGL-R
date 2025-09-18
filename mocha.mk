@@ -310,7 +310,8 @@ PRODUCT_PACKAGES += \
 
 # Seccomp
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh
+    $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh \
+    $(LOCAL_PATH)/initfiles/ussr_setup.sh:/system/bin/ussr_setup.sh
 
 # Sensors
 PRODUCT_PACKAGES += \
