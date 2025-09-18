@@ -58,7 +58,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.sys.ui.hw=false \
     debug.hwui.use_buffer_age=false \
     debug.hwui.renderer=opengl \
-    ro.surface_flinger.max_frame_buffer_acquired_buffers=2 \
+    ro.surface_flinger.max_frame_buffer_acquired_buffers=3 \
     debug.sf.disable_hwc=1
 
 # Lineage genuine

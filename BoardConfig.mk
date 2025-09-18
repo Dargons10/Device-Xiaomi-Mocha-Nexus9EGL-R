@@ -89,7 +89,7 @@ TARGET_SCREEN_DENSITY := 326
 
 # Graphics
 USE_OPENGL_RENDERER := true
-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 2
+NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
 BOARD_DISABLE_TRIPLE_BUFFERED_DISPLAY_SURFACES := true
 TARGET_DISABLE_POSTRENDER_CLEANUP := true
 SF_VSYNC_EVENT_PHASE_OFFSET_NS := 5000000
@@ -198,6 +198,12 @@ TARGET_LD_SHIM_LIBS += \
   /system/vendor/lib/libnvomxadaptor.so|/system/lib/liblog.so \
   /system/vendor/lib/libnvomx.so|/system/lib/liblog.so \
   /system/vendor/lib/libmplmpu.so|/system/lib/liblog.so
+
+# Nvmm shims
+TARGET_LD_SHIM_LIBS += \
+  /system/vendor/lib/libnvomxadaptor.so|/system/lib/libmedia_omx.so \
+  /system/vendor/lib/libnvomxadaptor.so|/system/vendor/lib/libnvmm_shim.so \
+  /system/vendor/lib/libnvmmlite_video.so|/system/vendor/lib/libnvos_shim.so
 
 # ThermalHAL
 TARGET_THERMALHAL_VARIANT := tegra
