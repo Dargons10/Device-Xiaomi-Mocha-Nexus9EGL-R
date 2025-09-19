@@ -79,8 +79,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # OMX
 PRODUCT_PROPERTY_OVERRIDES += \
-    persist.media.treble_omx=false
-
+persist.media.treble_omx=false \
+    persist.omx.use_hw_encoder=true \
+    persist.omx.use_hw_decoder=true \
+    persist.omx.hwaccel=true
+    
 # PBC
 PRODUCT_PROPERTY_OVERRIDES += \
    pbc.enabled=0 \
