@@ -1,0 +1,11 @@
+#Light
+type hal_light_hwservice, hwservice_manager_type;
+allow hal_light_service hwservice_manager:service_manager find; 
+
+#Power
+type hal_power_hwservice, hwservice_manager_type;
+allow hal_power_service hwservice_manager:service_manager find;
+
+#vibrator
+type hal_vibrator_hwservice, hwservice_manager_type;
+allow hal_vibrator_service hwservice_manager:service_manager find;

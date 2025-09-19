@@ -1,0 +1,41 @@
+allow hal_graphics_composer_default sysfs_gpu:file r_file_perms;
+allow hal_graphics_composer_default sysfs_gpu:dir r_dir_perms;
+allow hal_graphics_composer_default self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+allow hal_graphics_composer_default proc_meminfo:file r_file_perms;
+allow hal_graphics_composer_default display_prop:file { getattr open read };
+allow hal_graphics_composer_default mpctl_socket:dir search;
+allow hal_graphics_composer_default sysfs_graphics:lnk_file read;
+allow hal_graphics_composer_default qdisplay_service:service_manager { add find };
+allow hal_graphics_composer_default default_android_vndservice:service_manager { find add };
+allow hal_graphics_composer_default display_misc_file:dir create_dir_perms;
+allow hal_graphics_composer_default display_misc_file:file create_file_perms;
+allow hal_graphics_composer_default display_prop:property_service set;
+
+# TEMP untill i found the needeed nodes
+allow hal_graphics_composer_default device:dir r_dir_perms;
+
+allow hal_graphics_composer_default hal_configstore_ISurfaceFlingerConfigs:hwservice_manager find;
+allow hal_graphics_composer_default hal_configstore_default:binder call;
+vndbinder_use(hal_graphics_composer_default);
+allow hal_graphics_composer_default vndbinder_device:chr_file { read write ioctl };
+allow hal_graphics_composer_default system_prop:file { read };
+allow hal_graphics_composer_default default_prop:file { read };
+allow hal_graphics_composer_default chr_file:device [read open ioctl];
+allow hal_graphics_composer_default sysfs_graphics:file { read };
+allow hal_graphics_composer_default /dev/dri:chr_file { read write open ioctl };
+allow hal_graphics_composer_default /dev/nvidia*:chr_file { read write open ioctl };
+allow hal_graphics_composer_default /dev/input/event*:chr_file { read open };
+allow hal_graphics_composer_default self:tcp_socket { create connect };
+allow hal_graphics_composer_default shm:mem { read write create };
+allow hal_graphics_composer_default /var/log/some_log_file:file { write append };
+allow hal_graphics_composer_default /path/to/library.so:file { read open };
+
+# 允许 HAL 访问 vndbinder 和 sysfs
+allow hal_graphics_composer_default vndbinder_device:chr_file { open ioctl write };
+allow hal_graphics_composer_default sysfs:file { read open getattr };
+allow surfaceflinger sysfs:file { read open getattr };
+allow surfaceflinger dev:chr_file { open ioctl };
+
+# 允许访问图形相关属性（解决日志中的 default_prop/system_prop 拒绝）
+allow hal_graphics_composer_default default_prop:file { read open getattr };
+allow hal_graphics_composer_default system_prop:file { read open getattr };

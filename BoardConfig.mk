@@ -167,9 +167,9 @@ BOARD_OVERRIDE_RS_CPU_VARIANT_32 := cortex-a15
 
 # SELinux
 SELINUX_IGNORE_NEVERALLOWS := true
-BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/mocha \
-                       $(LOCAL_PATH)/sepolicy/lineage-common \
-                       $(LOCAL_PATH)/sepolicy/common
+include device/nvidia/sepolicy/sepolicy.mk
+BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/mocha
+BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/lineage-common
                       
 # SHIMS
 TARGET_LD_SHIM_LIBS := \

@@ -1,0 +1,27 @@
+allow vendor_init camera_data_file:dir create_dir_perms;
+allow vendor_init efs_data_file:dir create_dir_perms;
+allow vendor_init gps_data_file:dir create_dir_perms;
+allow vendor_init kickstart_data_file:dir create_dir_perms;
+allow vendor_init nfc_data_file:dir create_dir_perms;
+allow vendor_init tlk_data_file:dir create_dir_perms;
+
+allow vendor_init kernel:process setsched;
+allow vendor_init kickstart_data_file:dir setattr;
+allow vendor_init self:capability sys_nice;
+
+allow vendor_init camera_data_file:file create_file_perms;
+allow vendor_init proc:file write;
+allow fsck block_device:blk_file { read open write ioctl };
+allow vendor_init system_data_file:dir { write add_name create setattr };
+allow vendor_init system_data_file:dir { read open };
+
+# 允许vendor_init域读取apexd属性
+allow vendor_init apexd_prop:file read;
+
+# 允许 hwcomposer 访问 Tegra 图形设备节点
+allow hal_hwcomposer_default nvhost_device:chr_file { open read write ioctl };
+allow hal_hwcomposer_default sysfs_drm:file { open read };
+allow hal_hwcomposer_default sysfs_graphics:file { open read };
+
+# 允许访问显示信息节点
+allow hal_hwcomposer_default graphics_device:chr_file { open read write };
