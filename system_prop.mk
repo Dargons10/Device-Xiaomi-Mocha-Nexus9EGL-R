@@ -25,7 +25,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # DIDIM
 PRODUCT_PROPERTY_OVERRIDES += \
-    media.stagefright.legacyencoder=true \
+    media.stagefright.legacyencoder=false \
     media.stagefright.less-secure=true
 
 # DIDIM
