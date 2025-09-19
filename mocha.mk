@@ -69,7 +69,7 @@ PRODUCT_COPY_FILES += \
 # Bluetooth
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/bluetooth/bt_vendor.conf:system/etc/bluetooth/bt_vendor.conf \
-    $(LOCAL_PATH)/initfiles/bt_loader.sh:system/bin/bt_loader.sh
+    $(LOCAL_PATH)/initfiles/init.btloader.sh:system/bin/init.btloader.sh
 
 PRODUCT_PACKAGES += \
     libbt-vendor \
@@ -105,7 +105,8 @@ PRODUCT_PACKAGES += \
 # DRM HAL
 PRODUCT_PACKAGES += \
     android.hardware.drm@1.0-impl \
-    android.hardware.drm@1.0-service
+    android.hardware.drm@1.0-service 
+    #android.hardware.drm@1.1-service.clearkey
 
 # Doze
 PRODUCT_PACKAGES += \

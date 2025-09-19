@@ -17,7 +17,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.bt.enableAptXHD=true \
     persist.service.btui.use_aptx=1 \
     persist.vendor.bt.a2dp_offload_cap=sbc-aptx-aptxtws-aptxhd-aac-ldac \
-    persist.vendor.btstack.a2dp_offload_cap=sbc-aptx-aptxtws-aptxhd-aac-ldac
+    persist.vendor.btstack.a2dp_offload_cap=sbc-aptx-aptxtws-aptxhd-aac-ldacs
 
 # BT
 PRODUCT_PROPERTY_OVERRIDES += \
@@ -25,7 +25,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # DIDIM
 PRODUCT_PROPERTY_OVERRIDES += \
-    media.stagefright.legacyencoder=false \
+    media.stagefright.legacyencoder=true \
     media.stagefright.less-secure=true
 
 # DIDIM
@@ -79,10 +79,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # OMX
 PRODUCT_PROPERTY_OVERRIDES += \
-    persist.media.treble_omx=false \
-    persist.omx.use_hw_encoder=true \
-    persist.omx.use_hw_decoder=true \
-    persist.omx.hwaccel=true
+    persist.media.treble_omx=false
 
 # PBC
 PRODUCT_PROPERTY_OVERRIDES += \
