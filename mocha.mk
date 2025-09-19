@@ -109,7 +109,9 @@ PRODUCT_PACKAGES += \
 
 # Doze
 PRODUCT_PACKAGES += \
-    XiaomiParts
+    XiaomiParts \
+    DeviceSettings \
+    privapp-permissions-lineage-displaysettings.xml
 
 # fastbootd
 PRODUCT_PACKAGES += \
