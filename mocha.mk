@@ -144,7 +144,8 @@ PRODUCT_PACKAGES += \
     libshim_camera \
     libs \
     libshim_zw \
-    libshim_atomic
+    libshim_atomic \
+    libshim_gralloc
 
 
 # HIDL
