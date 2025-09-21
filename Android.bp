@@ -4,6 +4,7 @@ subdirs = [
     "tinyalsa",
     "health",
     "hardware",
+    "libmocha",
 ]
 
 cc_library_shared {

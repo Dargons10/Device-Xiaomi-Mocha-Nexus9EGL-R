@@ -35,7 +35,6 @@ PRODUCT_PACKAGES += \
     android.hardware.audio@6.0 \
     android.hardware.audio@6.0-impl \
     android.hardware.audio.effect@6.0-impl \
-    android.hardware.soundtrigger@2.0-impl \
     audio.a2dp.default \
     audio.usb.default \
     audio.r_submix.default \
@@ -74,7 +73,8 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     libbt-vendor \
     android.hardware.bluetooth@1.0-impl \
-    android.hardware.bluetooth@1.0-service
+    android.hardware.bluetooth@1.0-service \
+	libldacBT_bco
 
 # Camera
 #PRODUCT_COPY_FILES += \
@@ -105,14 +105,11 @@ PRODUCT_PACKAGES += \
 # DRM HAL
 PRODUCT_PACKAGES += \
     android.hardware.drm@1.0-impl \
-    android.hardware.drm@1.0-service 
-    #android.hardware.drm@1.1-service.clearkey
+    android.hardware.drm@1.0-service
 
 # Doze
 PRODUCT_PACKAGES += \
-    XiaomiParts \
-    DeviceSettings \
-    privapp-permissions-lineage-displaysettings.xml
+    XiaomiParts
 
 # fastbootd
 PRODUCT_PACKAGES += \
@@ -123,8 +120,12 @@ PRODUCT_PACKAGES += \
     setup_fs
 
 # FM
-#PRODUCT_PACKAGES += \
-#    android.hardware.broadcastradio@1.0-impl
+PRODUCT_PACKAGES += \
+    android.hardware.broadcastradio@1.0-impl \
+    FMRadio \
+    brcm-uim-sysfs \
+    libfmjni \
+    libfmradio.v4l2-fm
 
 # Graphics
 PRODUCT_AAPT_CONFIG += xlarge large
@@ -136,7 +137,7 @@ PRODUCT_PACKAGES += \
     android.hardware.graphics.allocator@2.0-impl \
     android.hardware.graphics.composer@2.1-impl \
     android.hardware.graphics.mapper@2.0-impl \
-    android.hardware.renderscript@1.0-impl \
+    android.hardware.renderscript@1.0-impl
 
 # Shims
 PRODUCT_PACKAGES += \
@@ -147,7 +148,7 @@ PRODUCT_PACKAGES += \
     libshim_camera \
     libs \
     libshim_zw \
-    libshim_atomic 
+    libshim_atomic
 
 
 # HIDL
@@ -189,7 +190,7 @@ PRODUCT_PACKAGES += \
     android.hardware.light@2.0-service.mocha
 
 # LiveDisplay
-   PRODUCT_PACKAGES += vendor.lineage.livedisplay@2.0-service-nvidia
+PRODUCT_PACKAGES += vendor.lineage.livedisplay@2.0-service-nvidia
 
 # Media_omx config
 PRODUCT_PACKAGES += \
@@ -206,7 +207,7 @@ PRODUCT_COPY_FILES += \
 
 # Memtrack
 PRODUCT_PACKAGES += \
-    android.hardware.memtrack@1.0-impl \
+	android.hardware.memtrack@1.0-impl \
     android.hardware.memtrack@1.0-service
 
 # NVIDIA
@@ -220,9 +221,9 @@ PRODUCT_COPY_FILES += \
 -include vendor/lineage/product/nvidia.mk
 
 # OMX(SOFTWARE)
-PRODUCT_PROPERTY_OVERRIDES += \
-    debug.stagefright.c2-poolmask=0x80000 \
-    debug.stagefright.ccodec=0
+#PRODUCT_PROPERTY_OVERRIDES += \
+#    debug.stagefright.c2-poolmask=0x80000 \
+#    debug.stagefright.ccodec=0
 
 # Overlay
 DEVICE_PACKAGE_OVERLAYS += \

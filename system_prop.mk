@@ -25,11 +25,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # DIDIM
 PRODUCT_PROPERTY_OVERRIDES += \
-    media.stagefright.legacyencoder=false \
-    media.stagefright.less-secure=true
-
-# DIDIM
-PRODUCT_PROPERTY_OVERRIDES += \
     persist.tegra.didim.enable=1 \
     persist.tegra.didim.video=5 \
     persist.tegra.didim.normal=3
@@ -44,7 +39,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Graphics
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.opengles.version=196610 \
+    ro.opengles.version=196609 \
     ro.sf.lcd_density=320 \
     persist.tegra.compositor=surfaceflinger \
     persist.tegra.decompression=cde-client \
@@ -68,7 +63,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # LMKD options
 PRODUCT_PROPERTY_OVERRIDES += \
  ro.lmk.low=1001 \
- ro.lmk.medium=800  \
+ ro.lmk.medium=800 \
  ro.lmk.critical=0 \
  ro.lmk.critical_upgrade=false \
  ro.lmk.upgrade_pressure=100 \
@@ -77,14 +72,17 @@ PRODUCT_PROPERTY_OVERRIDES += \
  ro.lmk.kill_timeout_ms=100 \
  ro.lmk.use_minfree_levels=true
 
+# Nvmm
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.tegra.nvmmlite = 1
+
 # OMX
 PRODUCT_PROPERTY_OVERRIDES += \
-persist.media.treble_omx=false \
-    persist.omx.use_hw_encoder=true \
-    persist.omx.use_hw_decoder=true \
-    persist.omx.hwaccel=true
-    
-# PBC
+    persist.media.treble_omx=false \
+    media.stagefright.less-secure=true \
+    media.stagefright.legacyencoder=true
+
+# pbc 
 PRODUCT_PROPERTY_OVERRIDES += \
    pbc.enabled=0 \
    pbc.log=0 \
@@ -103,7 +101,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # Radio
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.radio.noril=yes
-    
+
 # Storage
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.sys.sdcardfs=true
@@ -113,5 +111,5 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.debug.wfd.enable=1 \
     wifi.interface=wlan0 \
     ap.interface=wlan0 \
-    persist.tegra.nvmmlite=1 \
-    persist.wlan.ti.calibrated=0
+    persist.wlan.ti.calibrated =0 \
+    persist.debug.wfd.enable=1

@@ -18,7 +18,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-    NVOMXPlugin.cpp
+    NVOMXPlugin.cpp                      \
 
 LOCAL_CFLAGS := $(PV_CFLAGS_MINUS_VISIBILITY)
 
@@ -26,13 +26,12 @@ LOCAL_C_INCLUDES:= \
         frameworks/native/include/media/openmax \
         frameworks/native/include/media/hardware
 
-LOCAL_SHARED_LIBRARIES := \
-        liblog \
-        libbinder \
-        libutils \
-        libcutils \
-        libdl \
-        libui
+LOCAL_SHARED_LIBRARIES :=       \
+        libbinder               \
+        libutils                \
+        libcutils               \
+        libdl                   \
+        libui                   \
 
 LOCAL_MODULE := libstagefrighthw
 
