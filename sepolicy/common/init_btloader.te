@@ -1,3 +1,0 @@
-allow init_btloader self:capability { dac_override net_bind_service };
-allow init_btloader init_btloader_exec:file { read open execute };
-allow init init_btloader_exec:file { entrypoint execute };

@@ -79,7 +79,7 @@ LOCAL_CHECK_ELF_FILES := false
 TARGET_EXCLUDES_AUDIOFX := true
 
 # FM
-BOARD_HAVE_BCM_FM := true
+BOARD_HAVE_BCM_FM := false 
 
 # FS
 BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE := ext4
@@ -165,9 +165,9 @@ BOARD_OVERRIDE_RS_CPU_VARIANT_32 := cortex-a15
 
 # SELinux
 SELINUX_IGNORE_NEVERALLOWS := true
-include device/nvidia/sepolicy/sepolicy.mk
+BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/common
 BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/mocha
-BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/lineage-common
+BOARD_SEPOLICY_DIRS += $(LOCAL_PATH)/sepolicy/lineage
                       
 # SHIMS
 TARGET_LD_SHIM_LIBS := \
