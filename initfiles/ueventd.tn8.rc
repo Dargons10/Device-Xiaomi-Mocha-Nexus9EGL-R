@@ -95,6 +95,11 @@
 /sys/devices/platform/host1x tegradc.0/enable 0664 system system
 # sensors
 /dev/iio:device*	0660	system	system
+/sys/devices/platform/tegra12-i2c* iio:device* 0660 system system
+/sys/devices/platform/tegra12-i2c* enable 0660 system system
+/sys/devices/platform/tegra12-i2c* buffer/enable 0660 system system
+/sys/devices/platform/tegra12-i2c* buffer/length 0660 system system
+/sys/devices/platform/tegra12-i2c* scan_elements/in_timestamp_en 0660 system system
 /sys/devices/platform/tegra12-i2c.0/i2c-0/0-00*	enable	0660	system	system
 /sys/devices/platform/tegra12-i2c.0/i2c-0/0-00*	buffer/enable	0660	system	system
 /sys/devices/platform/tegra12-i2c.0/i2c-0/0-00*	buffer/length	0660	system	system
