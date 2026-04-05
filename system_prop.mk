@@ -113,3 +113,9 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ap.interface=wlan0 \
     persist.wlan.ti.calibrated =0 \
     persist.debug.wfd.enable=1
+
+# ART
+PRODUCT_PROPERTY_OVERRIDES += \
+    dalvik.vm.usejit=false \
+    dalvik.vm.usejitprofiles=false \
+    dalvik.vm.dex2oat-filter=speed
