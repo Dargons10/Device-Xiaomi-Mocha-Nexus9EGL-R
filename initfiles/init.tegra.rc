@@ -256,3 +256,6 @@ on property:sys.boot_completed=1
     # CPU performance for stable video playback
     exec /system/bin/sh -c "echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
     exec /system/bin/sh -c "echo 2116500 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+    # GPU max frequency (fixes 5000+ missed frames / visible artifacts)
+    exec /system/bin/sh -c "echo 852000000 > /dev/gpu_freq_min"
+    exec /system/bin/sh -c "echo 852000000 > /dev/gpu_freq_max"
