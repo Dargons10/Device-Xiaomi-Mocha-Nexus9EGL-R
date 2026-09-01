@@ -75,20 +75,11 @@ PRODUCT_PACKAGES += \
     libbt-vendor
 
 # Camera
-#PRODUCT_COPY_FILES += \
-#    $(LOCAL_PATH)/camera/nvcamera.conf:$(TARGET_COPY_OUT_VENDOR)/etc/nvcamera.conf \
-#    $(LOCAL_PATH)/camera/model_frontal.xml:$(TARGET_COPY_OUT_VENDOR)/etc/model_frontal.xml
-
-#PRODUCT_PACKAGES += \
-#    android.hardware.camera.provider@2.4-impl \
-#    camera.device@1.0-impl \
-#    camera.tegra \
-#    libmocha_camera \
-#    libmocha_omx \
-#    libpowerservice_client \
-#    libmocha_libc
-# Camera
 PRODUCT_PACKAGES += \
+    android.hardware.camera.provider@2.4-impl \
+    android.hardware.camera.provider@2.4-service \
+    camera.device@1.0-impl \
+    camera.tegra \
     libshim_camera
 
 # Comm Permissions
