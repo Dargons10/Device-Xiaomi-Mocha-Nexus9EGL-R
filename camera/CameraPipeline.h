@@ -84,6 +84,7 @@ private:
     void doAutoWhiteBalance(const uint8_t* rgbBuffer);
 
     int mFd;
+    int mSensorFd;
     int mCameraId;
     PipelineState mState;
     bool mStreaming;

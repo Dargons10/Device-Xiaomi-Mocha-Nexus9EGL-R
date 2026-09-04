@@ -11,7 +11,84 @@
 #include <sys/poll.h>
 #include <errno.h>
 #include <linux/videodev2.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
 
+#ifndef I2C_SLAVE_FORCE
+#define I2C_SLAVE_FORCE 0x0707
+#endif
+
+/* OV5693 full register table: 1280x720 @ 60fps, 1-lane CSI-E (mocha)
+ * Extracted from kernel/tegra/drivers/media/i2c/ov5693_mocha_mode_tbls.h
+ * Format: {reg16, val8} */
+static const struct { uint16_t reg; uint8_t val; } ov5693_regs_1280x720[] = {
+    {0x0100, 0x00}, {0x0103, 0x01}, {0x3001, 0x0a}, {0x3002, 0x80},
+    {0x3006, 0x00}, {0x3011, 0x21}, {0x3012, 0x09}, {0x3013, 0x10},
+    {0x3014, 0x00}, {0x3015, 0x08}, {0x3016, 0xf0}, {0x3017, 0xf0},
+    {0x3018, 0xf0}, {0x301b, 0xb4}, {0x301d, 0x02}, {0x3021, 0x00},
+    {0x3022, 0x01}, {0x3028, 0x44}, {0x3098, 0x03}, {0x3099, 0x1e},
+    {0x309a, 0x02}, {0x309b, 0x01}, {0x309c, 0x00}, {0x30a0, 0xd2},
+    {0x30a2, 0x01}, {0x30b2, 0x00}, {0x30b3, 0x68}, {0x30b4, 0x03},
+    {0x30b5, 0x04}, {0x30b6, 0x01}, {0x3104, 0x21}, {0x3106, 0x00},
+    {0x3406, 0x01}, {0x3500, 0x00}, {0x3501, 0x2e}, {0x3502, 0x80},
+    {0x3503, 0x07}, {0x3504, 0x00}, {0x3505, 0x00}, {0x3506, 0x00},
+    {0x3507, 0x02}, {0x3508, 0x00}, {0x3509, 0x10}, {0x350a, 0x00},
+    {0x350b, 0x40}, {0x3601, 0x0a}, {0x3602, 0x38}, {0x3612, 0x80},
+    {0x3620, 0x54}, {0x3621, 0xc7}, {0x3622, 0x0f}, {0x3625, 0x10},
+    {0x3630, 0x55}, {0x3631, 0xf4}, {0x3632, 0x00}, {0x3633, 0x34},
+    {0x3634, 0x02}, {0x364d, 0x0d}, {0x364f, 0xdd}, {0x3660, 0x04},
+    {0x3662, 0x10}, {0x3663, 0xf1}, {0x3665, 0x00}, {0x3666, 0x20},
+    {0x3667, 0x00}, {0x366a, 0x80}, {0x3680, 0xe0}, {0x3681, 0x00},
+    {0x3700, 0x42}, {0x3701, 0x14}, {0x3702, 0xa0}, {0x3703, 0xd8},
+    {0x3704, 0x78}, {0x3705, 0x02}, {0x3708, 0xe6}, {0x3709, 0xc7},
+    {0x370a, 0x00}, {0x370b, 0x20}, {0x370c, 0x0c}, {0x370d, 0x11},
+    {0x370e, 0x00}, {0x370f, 0x40}, {0x3710, 0x00}, {0x371a, 0x1c},
+    {0x371b, 0x05}, {0x371c, 0x01}, {0x371e, 0xa1}, {0x371f, 0x0c},
+    {0x3721, 0x00}, {0x3724, 0x10}, {0x3726, 0x00}, {0x372a, 0x01},
+    {0x3730, 0x10}, {0x3738, 0x22}, {0x3739, 0xe5}, {0x373a, 0x50},
+    {0x373b, 0x02}, {0x373c, 0x41}, {0x373f, 0x02}, {0x3740, 0x42},
+    {0x3741, 0x02}, {0x3742, 0x18}, {0x3743, 0x01}, {0x3744, 0x02},
+    {0x3747, 0x10}, {0x374c, 0x04}, {0x3751, 0xf0}, {0x3752, 0x00},
+    {0x3753, 0x00}, {0x3754, 0xc0}, {0x3755, 0x00}, {0x3756, 0x1a},
+    {0x3758, 0x00}, {0x3759, 0x0f}, {0x376b, 0x44}, {0x375c, 0x04},
+    {0x3774, 0x10}, {0x3776, 0x00}, {0x377f, 0x08}, {0x3780, 0x22},
+    {0x3781, 0x0c}, {0x3784, 0x2c}, {0x3785, 0x1e}, {0x378f, 0xf5},
+    {0x3791, 0xb0}, {0x3795, 0x00}, {0x3796, 0x64}, {0x3797, 0x11},
+    {0x3798, 0x30}, {0x3799, 0x41}, {0x379a, 0x07}, {0x379b, 0xb0},
+    {0x379c, 0x0c}, {0x37c5, 0x00}, {0x37c6, 0x00}, {0x37c7, 0x00},
+    {0x37c9, 0x00}, {0x37ca, 0x00}, {0x37cb, 0x00}, {0x37de, 0x00},
+    {0x37df, 0x00}, {0x3800, 0x00}, {0x3801, 0x00}, {0x3802, 0x00},
+    {0x3803, 0xf4}, {0x3804, 0x0a}, {0x3805, 0x3f}, {0x3806, 0x06},
+    {0x3807, 0xab}, {0x3808, 0x05}, {0x3809, 0x00}, {0x380a, 0x02},
+    {0x380b, 0xd0}, {0x380c, 0x06}, {0x380d, 0xd8}, {0x380e, 0x02},
+    {0x380f, 0xf8}, {0x3810, 0x00}, {0x3811, 0x02}, {0x3812, 0x00},
+    {0x3813, 0x02}, {0x3814, 0x31}, {0x3815, 0x31}, {0x3820, 0x04},
+    {0x3821, 0x1f}, {0x3823, 0x00}, {0x3824, 0x00}, {0x3825, 0x00},
+    {0x3826, 0x00}, {0x3827, 0x00}, {0x382a, 0x04}, {0x3a04, 0x06},
+    {0x3a05, 0x14}, {0x3a06, 0x00}, {0x3a07, 0xfe}, {0x3b00, 0x00},
+    {0x3b02, 0x00}, {0x3b03, 0x00}, {0x3b04, 0x00}, {0x3b05, 0x00},
+    {0x3e07, 0x20}, {0x4000, 0x08}, {0x4001, 0x04}, {0x4002, 0x45},
+    {0x4004, 0x08}, {0x4005, 0x18}, {0x4006, 0x20}, {0x4008, 0x24},
+    {0x4009, 0x10}, {0x400c, 0x00}, {0x400d, 0x00}, {0x4058, 0x00},
+    {0x404e, 0x37}, {0x404f, 0x8f}, {0x4058, 0x00}, {0x4101, 0xb2},
+    {0x4303, 0x00}, {0x4304, 0x08}, {0x4307, 0x30}, {0x4311, 0x04},
+    {0x4315, 0x01}, {0x4511, 0x05}, {0x4512, 0x00}, {0x4800, 0x20},
+    {0x4806, 0x00}, {0x4816, 0x52}, {0x481f, 0x30}, {0x4826, 0x2c},
+    {0x4831, 0x64}, {0x4d00, 0x04}, {0x4d01, 0x71}, {0x4d02, 0xfd},
+    {0x4d03, 0xf5}, {0x4d04, 0x0c}, {0x4d05, 0xcc}, {0x4837, 0x0a},
+    {0x5000, 0x06}, {0x5001, 0x01}, {0x5002, 0x00}, {0x5003, 0x20},
+    {0x5046, 0x0a}, {0x5013, 0x00}, {0x5046, 0x0a}, {0x5780, 0x1c},
+    {0x5786, 0x20}, {0x5787, 0x10}, {0x5788, 0x18}, {0x578a, 0x04},
+    {0x578b, 0x02}, {0x578c, 0x02}, {0x578e, 0x06}, {0x578f, 0x02},
+    {0x5790, 0x02}, {0x5791, 0xff}, {0x5842, 0x01}, {0x5843, 0x2b},
+    {0x5844, 0x01}, {0x5845, 0x92}, {0x5846, 0x01}, {0x5847, 0x8f},
+    {0x5848, 0x01}, {0x5849, 0x0c}, {0x5e00, 0x00}, {0x5e10, 0x0c},
+    /* Mocha 1-lane CSI-E overrides */
+    {0x3011, 0x11}, {0x3015, 0x28}, {0x380c, 0x0a}, {0x380d, 0x80},
+    {0x380e, 0x03}, {0x380f, 0xe0},
+    /* Start streaming */
+    {0x0100, 0x01},
+};
 
 #ifndef LOG_TAG
 #define LOG_TAG "MochaCameraHAL"
@@ -21,6 +98,7 @@ namespace mocha {
 
 CameraPipeline::CameraPipeline()
     : mFd(-1),
+      mSensorFd(-1),
       mState(PIPELINE_CLOSED),
       mRgbBuffer(nullptr),
       mRgbBufferSize(0),
@@ -84,6 +162,21 @@ int CameraPipeline::open(int cameraId) {
 
     if (cameraId == 0) {
         initFocuser();
+    } else {
+        /* Open I2C bus for OV5693 register access (front camera).
+           Use I2C_SLAVE_FORCE since kernel driver already has 0x36 bound. */
+        mSensorFd = ::open("/dev/i2c-2", O_RDWR);
+        if (mSensorFd < 0) {
+            ALOGE("Failed to open /dev/i2c-2: %s", strerror(errno));
+        } else {
+            if (ioctl(mSensorFd, I2C_SLAVE_FORCE, 0x36) < 0) {
+                ALOGE("I2C_SLAVE_FORCE 0x36 failed: %s", strerror(errno));
+                ::close(mSensorFd);
+                mSensorFd = -1;
+            } else {
+                ALOGI("I2C bus opened for OV5693 (addr 0x36, FORCE)");
+            }
+        }
     }
 
     mState = PIPELINE_OPENED;
@@ -111,6 +204,11 @@ int CameraPipeline::close() {
     if (mFd >= 0) {
         ::close(mFd);
         mFd = -1;
+    }
+
+    if (mSensorFd >= 0) {
+        ::close(mSensorFd);
+        mSensorFd = -1;
     }
 
     deinitFocuser();
@@ -205,7 +303,7 @@ int CameraPipeline::configure(const PipelineConfig& config) {
 
     struct v4l2_requestbuffers req;
     memset(&req, 0, sizeof(req));
-    req.count = 2;
+    req.count = 4;
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     req.memory = V4L2_MEMORY_MMAP;
 
@@ -215,8 +313,10 @@ int CameraPipeline::configure(const PipelineConfig& config) {
     }
 
     if (req.count < 2) {
+        ALOGE("VIDIOC_REQBUFS: only %d buffers available (need >=2)", req.count);
         return -ENOMEM;
     }
+    ALOGI("VIDIOC_REQBUFS: got %d buffers", req.count);
 
     mBufferCount = req.count;
 
@@ -288,6 +388,36 @@ int CameraPipeline::configure(const PipelineConfig& config) {
     return 0;
 }
 
+/* Write full OV5693 register table via I2C to properly configure sensor.
+ * Called AFTER VIDIOC_STREAMON (kernel s_stream already ran with 25 regs).
+ * This overwrites with the complete 250+ register configuration. */
+static void ov5693_init_via_i2c(int i2c_fd) {
+    if (i2c_fd < 0) return;
+
+    int count = sizeof(ov5693_regs_1280x720) / sizeof(ov5693_regs_1280x720[0]);
+    int errors = 0;
+
+    for (int i = 0; i < count; i++) {
+        uint8_t buf[3];
+        buf[0] = (ov5693_regs_1280x720[i].reg >> 8) & 0xff;
+        buf[1] = ov5693_regs_1280x720[i].reg & 0xff;
+        buf[2] = ov5693_regs_1280x720[i].val;
+
+        if (write(i2c_fd, buf, 3) != 3) {
+            if (errors < 5)
+                ALOGE("OV5693 I2C write reg=0x%04x val=0x%02x failed: %s",
+                      ov5693_regs_1280x720[i].reg, ov5693_regs_1280x720[i].val,
+                      strerror(errno));
+            errors++;
+        }
+    }
+
+    if (errors == 0)
+        ALOGI("OV5693: wrote %d registers via I2C successfully", count);
+    else
+        ALOGE("OV5693: %d/%d I2C writes failed", errors, count);
+}
+
 int CameraPipeline::startStreaming() {
     if (mState != PIPELINE_OPENED) return -EINVAL;
 
@@ -305,10 +435,16 @@ int CameraPipeline::startStreaming() {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(mFd, VIDIOC_STREAMON, &type) < 0) return -errno;
 
-    /* Set initial exposure/gain AFTER streaming starts (sensor must be powered) */
-    setExposure(mCurrentExposure);
-    setGain(mCurrentGain);
-    ALOGI("Initial exposure=%d gain=%d", mCurrentExposure, mCurrentGain);
+    if (mCameraId == 0) {
+        setExposure(mCurrentExposure);
+        setGain(mCurrentGain);
+        ALOGI("Initial exposure=%d gain=%d", mCurrentExposure, mCurrentGain);
+    } else {
+        /* Front camera: write full OV5693 register table via I2C.
+           Wait for kernel to power on sensor (s_power in capture thread). */
+        usleep(300000); /* 300ms - wait for sensor power-on */
+        ov5693_init_via_i2c(mSensorFd);
+    }
 
     mStreaming = true;
     mState = PIPELINE_STREAMING;
@@ -455,8 +591,14 @@ static void flipVertical(uint8_t* buf, int width, int height, int bpp) {
 }
 
 int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
-    if (mState != PIPELINE_STREAMING) return -EINVAL;
-    if (!outputBuffer) return -EINVAL;
+    if (mState != PIPELINE_STREAMING) {
+        ALOGE("captureFrame: state=%d (need STREAMING=%d)", mState, PIPELINE_STREAMING);
+        return -EINVAL;
+    }
+    if (!outputBuffer) {
+        ALOGE("captureFrame: null outputBuffer");
+        return -EINVAL;
+    }
 
     struct pollfd pfd;
     pfd.fd = mFd;
@@ -471,13 +613,22 @@ int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
     do {
         pfd.revents = 0;
         pollRet = poll(&pfd, 1, poll_timeout_ms);
-        if (pollRet < 0) return -errno;
+        if (pollRet < 0) {
+            ALOGE("captureFrame: poll error: %s", strerror(errno));
+            return -errno;
+        }
         if (pollRet == 0) {
             retry_count++;
-            if (retry_count >= max_retries) return -EAGAIN;
+            if (retry_count >= max_retries) {
+                ALOGE("captureFrame: poll timeout after %d retries", max_retries);
+                return -EAGAIN;
+            }
             continue;
         }
-        if (!(pfd.revents & POLLIN)) return -EAGAIN;
+        if (!(pfd.revents & POLLIN)) {
+            ALOGE("captureFrame: poll returned %d, revents=0x%x (no POLLIN)", pollRet, pfd.revents);
+            return -EAGAIN;
+        }
         break;
     } while (retry_count < max_retries);
 
@@ -488,14 +639,65 @@ int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
 
     int ret = ioctl(mFd, VIDIOC_DQBUF, &buf);
     if (ret < 0) {
-        if (errno == EAGAIN) return -EAGAIN;
+        if (errno == EAGAIN) {
+            ALOGE("captureFrame: DQBUF EAGAIN (no buffer ready)");
+            return -EAGAIN;
+        }
+        ALOGE("captureFrame: DQBUF error: %s", strerror(errno));
         return -errno;
     }
 
-    if (buf.index >= mBufferCount) return -EINVAL;
+    if (buf.index >= mBufferCount) {
+        ALOGE("captureFrame: buf.index=%u >= mBufferCount=%d", buf.index, mBufferCount);
+        return -EINVAL;
+    }
 
     uint8_t* frameBuffer = (uint8_t*)mBuffers[buf.index].start;
     uint32_t frameSize = buf.bytesused;
+
+    /* DEBUG: log raw Bayer stats every 100 frames */
+    static int rawDebugCount = 0;
+    if (rawDebugCount++ % 100 == 0) {
+        int minV = 255, maxV = 0;
+        int sampleCount = frameSize < 4000 ? (int)frameSize : 4000;
+        for (int i = 0; i < sampleCount; i++) {
+            if (frameBuffer[i] < minV) minV = frameBuffer[i];
+            if (frameBuffer[i] > maxV) maxV = frameBuffer[i];
+        }
+        /* Log first 32 bytes (16 pixels) as hex + 10-bit extracted values */
+        ALOGI("RAW Bayer debug: min=%d max=%d size=%u",
+              minV, maxV, frameSize);
+        ALOGI("  raw32: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+              frameBuffer[0], frameBuffer[1], frameBuffer[2], frameBuffer[3],
+              frameBuffer[4], frameBuffer[5], frameBuffer[6], frameBuffer[7],
+              frameBuffer[8], frameBuffer[9], frameBuffer[10], frameBuffer[11],
+              frameBuffer[12], frameBuffer[13], frameBuffer[14], frameBuffer[15]);
+        ALOGI("  raw32b: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+              frameBuffer[16], frameBuffer[17], frameBuffer[18], frameBuffer[19],
+              frameBuffer[20], frameBuffer[21], frameBuffer[22], frameBuffer[23],
+              frameBuffer[24], frameBuffer[25], frameBuffer[26], frameBuffer[27],
+              frameBuffer[28], frameBuffer[29], frameBuffer[30], frameBuffer[31]);
+        /* Log 4x4 grid of 10-bit values (v>>8) to see spatial pattern */
+        int w = 1280;
+        uint16_t g[4][4];
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 4; c++)
+                memcpy(&g[r][c], frameBuffer + (r * w + c) * 2, 2);
+        ALOGI("  grid r0: %d %d %d %d", g[0][0]>>8, g[0][1]>>8, g[0][2]>>8, g[0][3]>>8);
+        ALOGI("  grid r1: %d %d %d %d", g[1][0]>>8, g[1][1]>>8, g[1][2]>>8, g[1][3]>>8);
+        ALOGI("  grid r2: %d %d %d %d", g[2][0]>>8, g[2][1]>>8, g[2][2]>>8, g[2][3]>>8);
+        ALOGI("  grid r3: %d %d %d %d", g[3][0]>>8, g[3][1]>>8, g[3][2]>>8, g[3][3]>>8);
+        /* Middle of image */
+        int midY = 360, midX = 640;
+        uint16_t mg[4][4];
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 4; c++)
+                memcpy(&mg[r][c], frameBuffer + ((midY+r) * w + (midX+c)) * 2, 2);
+        ALOGI("  mid r0: %d %d %d %d", mg[0][0]>>8, mg[0][1]>>8, mg[0][2]>>8, mg[0][3]>>8);
+        ALOGI("  mid r1: %d %d %d %d", mg[1][0]>>8, mg[1][1]>>8, mg[1][2]>>8, mg[1][3]>>8);
+        ALOGI("  mid r2: %d %d %d %d", mg[2][0]>>8, mg[2][1]>>8, mg[2][2]>>8, mg[2][3]>>8);
+        ALOGI("  mid r3: %d %d %d %d", mg[3][0]>>8, mg[3][1]>>8, mg[3][2]>>8, mg[3][3]>>8);
+    }
 
     if (mConfig.enableISP && mDemosaic && mColorConv) {
         ret = processBayerToYuv(frameBuffer, outputBuffer, outputFormat);
