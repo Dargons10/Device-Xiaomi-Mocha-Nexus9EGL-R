@@ -93,6 +93,10 @@ Only the three quirks included above are recognized at this point:
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
+        <!-- NVIDIA VIC hardware decoder disabled: NvxNvMMTransformOpen fails
+             due to VIC contention with mediaserver (exclusive channel).
+             Forces fallback to OMX.google.h264.decoder (software). -->
+        <!--
         <MediaCodec name="OMX.Nvidia.h264.decode" type="video/avc" >
             <Limit name="size" min="32x32" max="3840x2176" />
             <Limit name="alignment" value="2x2" />
@@ -110,6 +114,7 @@ Only the three quirks included above are recognized at this point:
             <Feature name="adaptive-playback" />
             <Feature name="secure-playback" required="true" />
         </MediaCodec>
+        -->
         <MediaCodec name="OMX.Nvidia.vp8.decode" type="video/x-vnd.on2.vp8" >
             <Limit name="size" min="32x32" max="3840x2176" />
             <Limit name="alignment" value="2x2" />
