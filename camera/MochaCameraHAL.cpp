@@ -38,6 +38,7 @@ namespace mocha {
 // Camera configurations
 const MochaCameraInfo MochaCameraHAL::kCameras[] = {
     { 0, "IMX179", CAMERA_FACING_BACK, 90, 3280, false },
+    { 1, "OV2710", CAMERA_FACING_FRONT, 270, 1944, false },
 };
 
 const int MochaCameraHAL::kNumCameras = sizeof(MochaCameraHAL::kCameras) / sizeof(MochaCameraHAL::kCameras[0]);
@@ -180,7 +181,7 @@ static camera_metadata_t* init_static_characteristics(int cameraId) {
 
     // Sensor info
     int32_t sensor_width = cam.maxResolution;
-    int32_t sensor_height = (cam.maxResolution == 3280) ? 2464 : 1944;
+    int32_t sensor_height = (cameraId == 0) ? 2464 : 1456;
     add_camera_metadata_entry(metadata, ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE, (int32_t[]){0, 0, sensor_width, sensor_height}, 4);
     add_camera_metadata_entry(metadata, ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE, (int32_t[]){sensor_width, sensor_height}, 2);
     add_camera_metadata_entry(metadata, ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, (int32_t[]){0, 0, sensor_width, sensor_height}, 4);
@@ -779,10 +780,8 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
     mocha::PipelineConfig pipelineConfig;
     pipelineConfig.width = pipelineStream->width;
     pipelineConfig.height = pipelineStream->height;
-    /* DEBUG: Probando BGGR para IMX179 (commented code usaba BGGR(1,1) y daba colores).
-       El sensor podría ser BGGR pese a que la V4L2 driver dice SRGGB.
-       Usar identidad WB para ver línea base, luego ajustar. */
-    pipelineConfig.bayerPattern = 3;  // RGGB correcto
+    /* IMX179 (back) = SRGGB10 → RGGB(3). OV2710 (front) = SBGGR10 → BGGR(2). */
+     pipelineConfig.bayerPattern = (dev->camera_id == 0) ? 3 : 2;
     pipelineConfig.offset_x = 0;
     pipelineConfig.offset_y = 0;
     pipelineConfig.flipV = false;  // IMX179 mount normal; framework handles rotation
@@ -799,9 +798,11 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
      pipelineConfig.ccm[6] = 0.0f; pipelineConfig.ccm[7] = 0.0f; pipelineConfig.ccm[8] = 1.0f;
      pipelineConfig.gamma = 0.55f;
 
-     // Auto Exposure y Auto White Balance
-     pipelineConfig.enableAE = true;
-     pipelineConfig.enableAWB = true;  // corrige tinte verdoso
+      // Auto Exposure y Auto White Balance
+      // OV2710 (front) does not support V4L2_CID_EXPOSURE/GAIN (EIO).
+      // Disable AE/AWB for front camera; keep for back (IMX179).
+      pipelineConfig.enableAE = (dev->camera_id == 0);
+      pipelineConfig.enableAWB = (dev->camera_id == 0);
     pipelineConfig.targetLuma = 0.55f;
      pipelineConfig.digitalGain = 4.0f;  // 1.5 too dark (avgLuma 0.059); 6.0 clipped; 4.0 balances
  
@@ -1091,6 +1092,25 @@ static void copyFrameBetweenBuffers(const gralloc_module_t* grallocModule,
     grallocModule->unlock(grallocModule, *src->buffer);
 }
 
+// Cache the gralloc module. hw_get_module() re-runs hw_module_exists() (realpath +
+// access on every variant path) and a fresh dlopen on EVERY call; that path has
+// been observed to fail intermittently (returns -ENOENT) after a few frames, which
+// aborts frame processing and trips Camera3-Device's "serious error". Load once,
+// reuse the handle for the lifetime of the process (gralloc HAL is never unloaded).
+static const gralloc_module_t* get_gralloc_module() {
+    static const gralloc_module_t* cached = nullptr;
+    if (!cached) {
+        hw_module_t* module = nullptr;
+        int ret = hw_get_module(GRALLOC_HARDWARE_MODULE_ID, (const hw_module_t**)&module);
+        if (ret == 0) {
+            cached = reinterpret_cast<const gralloc_module_t*>(module);
+        } else {
+            ALOGE("get_gralloc_module: hw_get_module failed: %d", ret);
+        }
+    }
+    return cached;
+}
+
 static int camera_device_process_capture_request(const camera3_device_t *device, camera3_capture_request_t *request) {
     if (!device || !request) {
         ALOGE("Invalid parameters");
@@ -1168,23 +1188,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
         return -EINVAL;
     }
 
-    // Wait for acquire_fence before writing to buffer
+    // Acquire fence: VIC fences are never signaled on this platform.
+    // Skip the wait to avoid 2s/frame latency. Buffer is gralloc-allocated
+    // and ready immediately.
     int fence = buf.acquire_fence;
     if (fence >= 0) {
-        // Wait up to 2000ms for the buffer to be ready
-        struct pollfd pfd;
-        pfd.fd = fence;
-        pfd.events = POLLIN;
-        pfd.revents = 0;
-        int pollRet = poll(&pfd, 1, 2000);
-        if (pollRet > 0 && (pfd.revents & POLLIN)) {
-            // Fence signaled, buffer is ready
-            ALOGV("Acquire fence signaled for frame %u", frameNum);
-        } else if (pollRet == 0) {
-            ALOGW("Acquire fence timeout for frame %u, proceeding anyway", frameNum);
-        } else {
-            ALOGW("Acquire fence poll error for frame %u: %s", frameNum, strerror(errno));
-        }
         close(fence);
     }
 
@@ -1214,13 +1222,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
         buffer_handle_t handle = *buf.buffer;
         void* vaddr = nullptr;
 
-        const gralloc_module_t* grallocModule = nullptr;
-        hw_module_t* module = nullptr;
+        const gralloc_module_t* grallocModule = get_gralloc_module();
 
-        if (hw_get_module(GRALLOC_HARDWARE_MODULE_ID, (const hw_module_t**)&module) != 0) {
+        if (!grallocModule) {
             ALOGW("Failed to get gralloc module");
         } else {
-            grallocModule = reinterpret_cast<const gralloc_module_t*>(module);
 
             /* BLOB format = JPEG still capture */
             if (buf.stream->format == HAL_PIXEL_FORMAT_BLOB) {
