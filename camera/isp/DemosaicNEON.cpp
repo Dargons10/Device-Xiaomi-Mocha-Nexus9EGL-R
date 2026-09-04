@@ -29,6 +29,21 @@ int DemosaicNEON::initialize(const DemosaicParams& params) {
 }
 
 static void raw10_to_8bit(const uint8_t* in, uint8_t* out, int total, uint16_t bl) {
+    /* V4L2_PIX_FMT_Sxx10: 10-bit value in upper 10 bits of 16-bit container.
+       pixel = v >> 6, then scale to 8-bit: (pixel * 255) / 1023 ≈ pixel >> 2.
+       Combined: (v >> 6) >> 2 = v >> 8, then scale by 255/1023... 
+       Actually: v >> 6 gives 10-bit [0..1023]. To get 8-bit: (v>>6) * 255/1023.
+       Simplified: (v >> 6) >> 2 = v >> 8 gives [0..3], wrong.
+       Correct: extract 10-bit (v>>6), then map to 8-bit: (val10 * 255) >> 10.
+       For NEON: vshrn_n_u16(a, 6) gives 8-bit from 10-bit (truncates to 8 bits of the 10-bit value).
+       That's val10 & 0xFF, losing the top 2 bits. Not ideal but close.
+       Better: use vshrn_n_u16(a, 6) which does (a >> 6) & 0xFF = val10 & 0xFF.
+       Since val10 is [0..1023], val10 & 0xFF loses bits 9-10.
+       For better accuracy: (val10 * 255) / 1023 ≈ val10 * 0.249 ≈ val10 >> 2.
+       So: (v >> 6) >> 2 = v >> 8. But v >> 8 of a 16-bit value gives [0..255] directly!
+       Wait: v = (val10 << 6). v >> 8 = val10 << 6 >> 8 = val10 >> 2.
+       That's val10/4, range [0..255]. Close enough (slightly dark).
+       For exact: val10 * 255 / 1023. But v>>8 = val10>>2 is a good approximation. */
     int i = 0;
     uint8x16_t blv = vdupq_n_u8(bl);
     for (; i + 16 <= total; i += 16) {
@@ -36,13 +51,14 @@ static void raw10_to_8bit(const uint8_t* in, uint8_t* out, int total, uint16_t b
         memcpy(tmp, in + i * 2, 32);
         uint16x8_t a = vld1q_u16(tmp);
         uint16x8_t b = vld1q_u16(tmp + 8);
-        uint8x16_t v = vcombine_u8(vshrn_n_u16(a, 2), vshrn_n_u16(b, 2));
+        /* v >> 8: extracts 10-bit value scaled to 8-bit (val10>>2, range 0..255) */
+        uint8x16_t v = vcombine_u8(vshrn_n_u16(a, 8), vshrn_n_u16(b, 8));
         vst1q_u8(out + i, vqsubq_u8(v, blv));
     }
     for (; i < total; i++) {
         uint16_t v;
         memcpy(&v, in + i * 2, 2);
-        int p = (v >> 2) - bl;
+        int p = (v >> 8) - bl;
         out[i] = p > 0 ? (uint8_t)p : 0;
     }
 }
