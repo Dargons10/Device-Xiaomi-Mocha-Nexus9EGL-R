@@ -374,6 +374,10 @@ PRODUCT_PACKAGES += \
     wpa_supplicant.conf
 
 
+# Camera app
+PRODUCT_PACKAGES += \
+    Camera2
+
 # Vendor security patch level
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.lineage.build.vendor_security_patch=2018-01-05 \
