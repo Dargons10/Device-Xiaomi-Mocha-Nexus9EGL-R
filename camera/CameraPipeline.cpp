@@ -677,26 +677,26 @@ int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
               frameBuffer[20], frameBuffer[21], frameBuffer[22], frameBuffer[23],
               frameBuffer[24], frameBuffer[25], frameBuffer[26], frameBuffer[27],
               frameBuffer[28], frameBuffer[29], frameBuffer[30], frameBuffer[31]);
-        /* Log 4x4 grid of 10-bit values (v>>8) to see spatial pattern */
+        /* Log 4x4 grid of 10-bit values (v & 0xFF) to see spatial pattern */
         int w = 1280;
         uint16_t g[4][4];
         for (int r = 0; r < 4; r++)
             for (int c = 0; c < 4; c++)
                 memcpy(&g[r][c], frameBuffer + (r * w + c) * 2, 2);
-        ALOGI("  grid r0: %d %d %d %d", g[0][0]>>8, g[0][1]>>8, g[0][2]>>8, g[0][3]>>8);
-        ALOGI("  grid r1: %d %d %d %d", g[1][0]>>8, g[1][1]>>8, g[1][2]>>8, g[1][3]>>8);
-        ALOGI("  grid r2: %d %d %d %d", g[2][0]>>8, g[2][1]>>8, g[2][2]>>8, g[2][3]>>8);
-        ALOGI("  grid r3: %d %d %d %d", g[3][0]>>8, g[3][1]>>8, g[3][2]>>8, g[3][3]>>8);
+        ALOGI("  grid r0: %d %d %d %d", g[0][0]&0xFF, g[0][1]&0xFF, g[0][2]&0xFF, g[0][3]&0xFF);
+        ALOGI("  grid r1: %d %d %d %d", g[1][0]&0xFF, g[1][1]&0xFF, g[1][2]&0xFF, g[1][3]&0xFF);
+        ALOGI("  grid r2: %d %d %d %d", g[2][0]&0xFF, g[2][1]&0xFF, g[2][2]&0xFF, g[2][3]&0xFF);
+        ALOGI("  grid r3: %d %d %d %d", g[3][0]&0xFF, g[3][1]&0xFF, g[3][2]&0xFF, g[3][3]&0xFF);
         /* Middle of image */
         int midY = 360, midX = 640;
         uint16_t mg[4][4];
         for (int r = 0; r < 4; r++)
             for (int c = 0; c < 4; c++)
                 memcpy(&mg[r][c], frameBuffer + ((midY+r) * w + (midX+c)) * 2, 2);
-        ALOGI("  mid r0: %d %d %d %d", mg[0][0]>>8, mg[0][1]>>8, mg[0][2]>>8, mg[0][3]>>8);
-        ALOGI("  mid r1: %d %d %d %d", mg[1][0]>>8, mg[1][1]>>8, mg[1][2]>>8, mg[1][3]>>8);
-        ALOGI("  mid r2: %d %d %d %d", mg[2][0]>>8, mg[2][1]>>8, mg[2][2]>>8, mg[2][3]>>8);
-        ALOGI("  mid r3: %d %d %d %d", mg[3][0]>>8, mg[3][1]>>8, mg[3][2]>>8, mg[3][3]>>8);
+        ALOGI("  mid r0: %d %d %d %d", mg[0][0]&0xFF, mg[0][1]&0xFF, mg[0][2]&0xFF, mg[0][3]&0xFF);
+        ALOGI("  mid r1: %d %d %d %d", mg[1][0]&0xFF, mg[1][1]&0xFF, mg[1][2]&0xFF, mg[1][3]&0xFF);
+        ALOGI("  mid r2: %d %d %d %d", mg[2][0]&0xFF, mg[2][1]&0xFF, mg[2][2]&0xFF, mg[2][3]&0xFF);
+        ALOGI("  mid r3: %d %d %d %d", mg[3][0]&0xFF, mg[3][1]&0xFF, mg[3][2]&0xFF, mg[3][3]&0xFF);
     }
 
     if (mConfig.enableISP && mDemosaic && mColorConv) {
