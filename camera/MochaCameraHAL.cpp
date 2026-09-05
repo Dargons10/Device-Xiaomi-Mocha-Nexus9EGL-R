@@ -21,6 +21,8 @@
 #include <linux/videodev2.h>
 #include <sys/poll.h>
 #include <time.h>
+#include <signal.h>
+#include <setjmp.h>
 #include <cstdio>
 
 #include "MochaCameraHAL.h"
@@ -48,6 +50,69 @@ static camera_metadata_t* gCameraCharacteristics[2] = { nullptr, nullptr };
 
 // Module callbacks
 static camera_module_callbacks_t gModuleCallbacks;
+
+// --- SIGSEGV/SIGBUS guard for gralloc lock calls ---------------------------
+// The framework can free a gralloc buffer while the HAL still holds a handle
+// to it (use-after-free). NvGrLock then dereferences the freed buffer object
+// (e.g. locking its internal mutex) and raises SIGSEGV, killing the whole
+// camera provider. We install a per-thread guard: if a SIGSEGV/SIGBUS happens
+// inside a guarded gralloc lock, we siglongjmp back to the guard and skip the
+// frame instead of crashing. jmp_buf + armed flag are thread-local because the
+// HwBinder pool processes capture requests on multiple threads concurrently.
+namespace segv_guard {
+
+__thread jmp_buf jmpbuf;
+__thread volatile sig_atomic_t armed = 0;
+static volatile sig_atomic_t caught_total = 0;
+static volatile sig_atomic_t installed = 0;
+
+static void handler(int sig, siginfo_t* info, void* ucontext) {
+    (void)info;
+    (void)ucontext;
+    if (armed) {
+        caught_total++;
+        siglongjmp(jmpbuf, 1);
+    }
+    // Not inside a guarded section: restore default disposition and re-raise so
+    // genuine bugs still crash and write a tombstone.
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void ensure_installed() {
+    if (installed) return;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
+    installed = 1;
+    ALOGI("SEGFAULT guard installed for gralloc locks");
+}
+
+static uint32_t caught_count() { return (uint32_t)caught_total; }
+
+}  // namespace segv_guard
+
+// Runs `fn` under the SIGSEGV/SIGBUS guard. Returns 0 if fn ran to completion,
+// or -EFAULT if a fault was caught (fn did not complete; the buffer was invalid).
+template <typename F>
+static int run_guarded(F&& fn) {
+    segv_guard::ensure_installed();
+    if (sigsetjmp(segv_guard::jmpbuf, 1) == 0) {
+        segv_guard::armed = 1;
+        fn();
+        segv_guard::armed = 0;
+        return 0;
+    }
+    // Reached via siglongjmp after a caught fault.
+    segv_guard::armed = 0;
+    ALOGE("gralloc lock fault caught (SIGSEGV/SIGBUS) - invalid/freed buffer, skipping frame (total caught=%u)",
+          segv_guard::caught_count());
+    return -EFAULT;
+}
 
 // Forward declarations
 static int camera_device_init(const hw_module_t *module, hw_device_t **device);
@@ -804,7 +869,7 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
       pipelineConfig.enableAE = (dev->camera_id == 0);
       pipelineConfig.enableAWB = (dev->camera_id == 0);
     pipelineConfig.targetLuma = 0.55f;
-     pipelineConfig.digitalGain = 4.0f;  // 1.5 too dark (avgLuma 0.059); 6.0 clipped; 4.0 balances
+      pipelineConfig.digitalGain = 1.0f;  // raw10_to_8bit already outputs correct 8-bit scale
  
     // Override IMPLEMENTATION_DEFINED to RGBA_8888 (Tegra gralloc allocates
     // RGBA for non-YUV formats). Keep YCbCr_420_888 and BLOB as-is.
@@ -1070,26 +1135,30 @@ static void copyFrameBetweenBuffers(const gralloc_module_t* grallocModule,
               src->stream->width, src->stream->height, dst->stream->width, dst->stream->height);
         return;
     }
-    void* srcVaddr = nullptr;
-    void* dstVaddr = nullptr;
-    int ret = grallocModule->lock(grallocModule, *src->buffer, GRALLOC_USAGE_SW_READ_OFTEN,
-                                  0, 0, src->stream->width, src->stream->height, &srcVaddr);
-    if (ret != 0 || !srcVaddr) {
-        ALOGE("copyFrameBetweenBuffers: failed to lock src buffer: %d", ret);
-        return;
-    }
-    ret = grallocModule->lock(grallocModule, *dst->buffer, GRALLOC_USAGE_SW_WRITE_OFTEN,
-                              0, 0, dst->stream->width, dst->stream->height, &dstVaddr);
-    if (ret != 0 || !dstVaddr) {
+    // Both src and dst handles may be dangling (framework freed the buffer while we
+    // still hold it); lock/memcpy/unlock are all guarded against SIGSEGV.
+    run_guarded([&]() {
+        void* srcVaddr = nullptr;
+        void* dstVaddr = nullptr;
+        int ret = grallocModule->lock(grallocModule, *src->buffer, GRALLOC_USAGE_SW_READ_OFTEN,
+                                      0, 0, src->stream->width, src->stream->height, &srcVaddr);
+        if (ret != 0 || !srcVaddr) {
+            ALOGE("copyFrameBetweenBuffers: failed to lock src buffer: %d", ret);
+            return;
+        }
+        ret = grallocModule->lock(grallocModule, *dst->buffer, GRALLOC_USAGE_SW_WRITE_OFTEN,
+                                  0, 0, dst->stream->width, dst->stream->height, &dstVaddr);
+        if (ret != 0 || !dstVaddr) {
+            grallocModule->unlock(grallocModule, *src->buffer);
+            ALOGE("copyFrameBetweenBuffers: failed to lock dst buffer: %d", ret);
+            return;
+        }
+        // RGBA_8888: 4 bytes/pixel. (Both preview and video streams are RGBA_8888 here.)
+        size_t size = (size_t)dst->stream->width * dst->stream->height * 4;
+        memcpy(dstVaddr, srcVaddr, size);
+        grallocModule->unlock(grallocModule, *dst->buffer);
         grallocModule->unlock(grallocModule, *src->buffer);
-        ALOGE("copyFrameBetweenBuffers: failed to lock dst buffer: %d", ret);
-        return;
-    }
-    // RGBA_8888: 4 bytes/pixel. (Both preview and video streams are RGBA_8888 here.)
-    size_t size = (size_t)dst->stream->width * dst->stream->height * 4;
-    memcpy(dstVaddr, srcVaddr, size);
-    grallocModule->unlock(grallocModule, *dst->buffer);
-    grallocModule->unlock(grallocModule, *src->buffer);
+    });
 }
 
 // Cache the gralloc module. hw_get_module() re-runs hw_module_exists() (realpath +
@@ -1242,13 +1311,19 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
                 } else {
                     int captureRet = pipeline->captureFrame(dev->temp_rgba, HAL_PIXEL_FORMAT_RGBA_8888);
                     if (captureRet == 0) {
-                        /* Lock the output blob buffer using its own dimensions */
+                        /* Lock the output blob buffer using its own dimensions.
+                         * lock/encode/unlock all touch the gralloc buffer which may be
+                         * a dangling handle, so guard the whole block against SIGSEGV. */
                         uint32_t blobW = buf.stream->width;
                         uint32_t blobH = buf.stream->height;
-                        int ret = grallocModule->lock(grallocModule, handle,
-                                                       GRALLOC_USAGE_SW_WRITE_OFTEN,
-                                                       0, 0, blobW, blobH, &vaddr);
-                        if (ret == 0 && vaddr) {
+                        run_guarded([&]() {
+                            int ret = grallocModule->lock(grallocModule, handle,
+                                                           GRALLOC_USAGE_SW_WRITE_OFTEN,
+                                                           0, 0, blobW, blobH, &vaddr);
+                            if (ret != 0 || !vaddr) {
+                                ALOGE("Failed to lock BLOB buffer");
+                                return;
+                            }
                             /* Initialize JPEG encoder */
                             if (!dev->jpeg_encoder) {
                                 dev->jpeg_encoder = new mocha::JpegEncoder();
@@ -1274,9 +1349,7 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
                                 ALOGE("JPEG encode failed: %d", ret);
                             }
                             grallocModule->unlock(grallocModule, handle);
-                        } else {
-                            ALOGE("Failed to lock BLOB buffer");
-                        }
+                        });
                     } else if (captureRet == -EAGAIN) {
                         if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
                         return -EAGAIN;
@@ -1287,34 +1360,42 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
             } else if (buf.stream->format == HAL_PIXEL_FORMAT_YCBCR_420_888) {
                 struct android_ycbcr ycbcr;
                 memset(&ycbcr, 0, sizeof(ycbcr));
-                int ret = grallocModule->lock_ycbcr(grallocModule, handle,
-                                                   GRALLOC_USAGE_SW_WRITE_OFTEN,
-                                                   0, 0, buf.stream->width, buf.stream->height, &ycbcr);
-                if (ret == 0 && ycbcr.y) {
-                    int captureRet = pipeline->captureFrame(static_cast<uint8_t*>(ycbcr.y), buf.stream->format);
+                int captureRet = 0;
+                run_guarded([&]() {
+                    int ret = grallocModule->lock_ycbcr(grallocModule, handle,
+                                                        GRALLOC_USAGE_SW_WRITE_OFTEN,
+                                                        0, 0, buf.stream->width, buf.stream->height, &ycbcr);
+                    if (ret != 0 || !ycbcr.y) {
+                        return;
+                    }
+                    captureRet = pipeline->captureFrame(static_cast<uint8_t*>(ycbcr.y), buf.stream->format);
                     if (captureRet == 0) {
                         frameCaptured = true;
-                    } else if (captureRet == -EAGAIN) {
-                        grallocModule->unlock(grallocModule, handle);
-                        if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
-                        return -EAGAIN;
                     }
                     grallocModule->unlock(grallocModule, handle);
+                });
+                if (captureRet == -EAGAIN) {
+                    if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
+                    return -EAGAIN;
                 }
             } else {
                 int usage = GRALLOC_USAGE_SW_WRITE_OFTEN;
-                int ret = grallocModule->lock(grallocModule, handle, usage,
-                                              0, 0, buf.stream->width, buf.stream->height, &vaddr);
-                if (ret == 0 && vaddr) {
-                    int captureRet = pipeline->captureFrame(static_cast<uint8_t*>(vaddr), buf.stream->format);
+                int captureRet = 0;
+                run_guarded([&]() {
+                    int ret = grallocModule->lock(grallocModule, handle, usage,
+                                                  0, 0, buf.stream->width, buf.stream->height, &vaddr);
+                    if (ret != 0 || !vaddr) {
+                        return;
+                    }
+                    captureRet = pipeline->captureFrame(static_cast<uint8_t*>(vaddr), buf.stream->format);
                     if (captureRet == 0) {
                         frameCaptured = true;
-                    } else if (captureRet == -EAGAIN) {
-                        grallocModule->unlock(grallocModule, handle);
-                        if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
-                        return -EAGAIN;
                     }
                     grallocModule->unlock(grallocModule, handle);
+                });
+                if (captureRet == -EAGAIN) {
+                    if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
+                    return -EAGAIN;
                 }
             }
 
