@@ -87,8 +87,8 @@ on property:sys.boot_completed=1
     write /dev/cpuset/top-app/mems 0
 
 on init
-    chmod 0775 /vendor/bin/bt_loader.sh
-    chown root system /vendor/bin/bt_loader.sh
+    chmod 0775 /system/bin/bt_loader.sh
+    chown root system /system/bin/bt_loader.sh
     start bt_loader
        
     # Mount a tmpfs into /mnt/tmp for hosting nvram, phs shared memory
@@ -104,7 +104,7 @@ on init
     seclabel u:r:conn_wifi:s0
     oneshot
 
-service bt_loader /vendor/bin/bt_loader.sh 
+service bt_loader /system/bin/bt_loader.sh
     class main
     user root
     group system
