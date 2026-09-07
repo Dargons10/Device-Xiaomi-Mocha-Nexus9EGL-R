@@ -24,6 +24,10 @@
 #include <signal.h>
 #include <setjmp.h>
 #include <cstdio>
+#include <dirent.h>
+#include <thread>
+#include <atomic>
+#include <unistd.h>
 
 #include "MochaCameraHAL.h"
 #include "CameraPipeline.h"
@@ -95,6 +99,60 @@ static void ensure_installed() {
 static uint32_t caught_count() { return (uint32_t)caught_total; }
 
 }  // namespace segv_guard
+
+// --- sync_fence fd leak cleanup -------------------------------------------
+// The Tegra VIC kernel driver creates sync_fence fds for each captured frame
+// and passes them to the camera provider process. These fences are never
+// closed by the HAL, causing a massive fd leak. When the fd limit (32768)
+// is hit, HandleImporter fails and the app shows a fatal error.
+// This thread periodically scans /proc/self/fd and closes leaked fences.
+namespace fence_cleanup {
+
+static std::atomic<bool> gStarted{false};
+static std::thread gThread;
+
+static void loop() {
+    while (true) {
+        usleep(5000000); // 5 seconds
+
+        DIR* dir = opendir("/proc/self/fd");
+        if (!dir) continue;
+
+        int closed = 0;
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (entry->d_name[0] == '.') continue;
+
+            char path[256];
+            snprintf(path, sizeof(path), "/proc/self/fd/%s", entry->d_name);
+
+            char target[256];
+            ssize_t len = readlink(path, target, sizeof(target) - 1);
+            if (len <= 0) continue;
+            target[len] = '\0';
+
+            if (strncmp(target, "anon_inode:sync_fence", 21) == 0) {
+                int fd = atoi(entry->d_name);
+                close(fd);
+                closed++;
+            }
+        }
+        closedir(dir);
+
+        if (closed > 0) {
+            ALOGI("Fence cleanup: closed %d leaked sync_fence fds", closed);
+        }
+    }
+}
+
+static void start() {
+    if (gStarted.exchange(true)) return;
+    gThread = std::thread(loop);
+    gThread.detach();
+    ALOGI("Fence cleanup thread started");
+}
+
+}  // namespace fence_cleanup
 
 // Runs `fn` under the SIGSEGV/SIGBUS guard. Returns 0 if fn ran to completion,
 // or -EFAULT if a fault was caught (fn did not complete; the buffer was invalid).
@@ -641,7 +699,9 @@ static camera_metadata_t* init_static_characteristics(int cameraId) {
 
 static int camera_device_init(const hw_module_t *module, hw_device_t **device) {
     ALOGI("camera_device_init");
-    
+
+    fence_cleanup::start();
+
     mocha_camera_device_t *dev = new mocha_camera_device_t();
     if (!dev) {
         ALOGE("Failed to allocate camera device");
@@ -1093,6 +1153,11 @@ static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t ti
     uint8_t resultAfTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AF_TRIGGER, &resultAfTrigger, 1);
 
+    /* ANDROID_CONTROL_AF_STATE - Report INACTIVE so AFTriggerResult completes
+       and ConvergedImageCaptureCommand can proceed to captureBurst(). */
+    uint8_t resultAfState = ANDROID_CONTROL_AF_STATE_INACTIVE;
+    add_camera_metadata_entry(metadata, ANDROID_CONTROL_AF_STATE, &resultAfState, 1);
+
     /* ANDROID_REQUEST_ID */
     int32_t requestId = (int32_t)frameNumber;
     add_camera_metadata_entry(metadata, ANDROID_REQUEST_ID, &requestId, 1);
@@ -1249,35 +1314,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
         }
     }
 
-    const camera3_stream_buffer_t& buf = request->output_buffers[0];
-    
-    if (!buf.buffer) {
-        ALOGE("Invalid buffer");
-        if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
-        return -EINVAL;
-    }
-
-    // Acquire fence: VIC fences are never signaled on this platform.
-    // Skip the wait to avoid 2s/frame latency. Buffer is gralloc-allocated
-    // and ready immediately.
-    int fence = buf.acquire_fence;
-    if (fence >= 0) {
-        close(fence);
-    }
-
-    ALOGI("Processing capture: frame=%llu stream=%dx%d format=%d pipeline=%dx%d",
-          (unsigned long long)request->frame_number,
-          buf.stream->width, buf.stream->height, buf.stream->format,
-          dev->pipeline_width, dev->pipeline_height);
-
- 
     bool frameCaptured = false;
 
-    // Capture frame from pipeline
     if (dev->pipeline && dev->streams_configured) {
         mocha::CameraPipeline* pipeline = static_cast<mocha::CameraPipeline*>(dev->pipeline);
 
-        // Auto-restart pipeline if it was stopped by flush()
         if (pipeline->getState() == mocha::PIPELINE_OPENED) {
             ALOGI("process_capture_request: pipeline in OPENED state, re-starting streaming");
             int restartRet = pipeline->startStreaming();
@@ -1288,123 +1329,117 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
             }
         }
 
-        buffer_handle_t handle = *buf.buffer;
-        void* vaddr = nullptr;
-
         const gralloc_module_t* grallocModule = get_gralloc_module();
 
         if (!grallocModule) {
             ALOGW("Failed to get gralloc module");
         } else {
+            for (uint32_t i = 0; i < request->num_output_buffers; i++) {
+                const camera3_stream_buffer_t& outBuf = request->output_buffers[i];
+                if (!outBuf.buffer) continue;
 
-            /* BLOB format = JPEG still capture */
-            if (buf.stream->format == HAL_PIXEL_FORMAT_BLOB) {
-                /* Allocate temp RGBA buffer at pipeline resolution */
-                uint32_t rgbaSize = dev->pipeline_width * dev->pipeline_height * 4;
-                if (!dev->temp_rgba || dev->temp_rgba_size < rgbaSize) {
-                    if (dev->temp_rgba) free(dev->temp_rgba);
-                    dev->temp_rgba = (uint8_t*)malloc(rgbaSize);
-                    dev->temp_rgba_size = rgbaSize;
-                }
-                if (!dev->temp_rgba) {
-                    ALOGE("Failed to allocate temp RGBA buffer");
-                } else {
-                    int captureRet = pipeline->captureFrame(dev->temp_rgba, HAL_PIXEL_FORMAT_RGBA_8888);
-                    if (captureRet == 0) {
-                        /* Lock the output blob buffer using its own dimensions.
-                         * lock/encode/unlock all touch the gralloc buffer which may be
-                         * a dangling handle, so guard the whole block against SIGSEGV. */
-                        uint32_t blobW = buf.stream->width;
-                        uint32_t blobH = buf.stream->height;
-                        run_guarded([&]() {
-                            int ret = grallocModule->lock(grallocModule, handle,
-                                                           GRALLOC_USAGE_SW_WRITE_OFTEN,
-                                                           0, 0, blobW, blobH, &vaddr);
-                            if (ret != 0 || !vaddr) {
-                                ALOGE("Failed to lock BLOB buffer");
-                                return;
-                            }
-                            /* Initialize JPEG encoder */
-                            if (!dev->jpeg_encoder) {
-                                dev->jpeg_encoder = new mocha::JpegEncoder();
-                            }
-                            /* Encode RGBA to JPEG at pipeline resolution into blob buffer */
-                            size_t jpegSize = 0;
-                            uint32_t blobSize = blobW * blobH * 2;
-                            ret = dev->jpeg_encoder->encodeRGBA(dev->temp_rgba,
-                                                                  dev->pipeline_width, dev->pipeline_height,
-                                                                  90, (uint8_t*)vaddr, blobSize, &jpegSize);
-                            if (ret == 0 && jpegSize > 0) {
-                                /* Write camera3_jpeg_blob at the end */
-                                camera3_jpeg_blob_t blob;
-                                blob.jpeg_blob_id = CAMERA3_JPEG_BLOB_ID;
-                                blob.jpeg_size = jpegSize;
-                                uint8_t* blobPtr = (uint8_t*)vaddr + blobSize - sizeof(blob);
-                                memcpy(blobPtr, &blob, sizeof(blob));
-                                frameCaptured = true;
-                                ALOGI("JPEG captured: pipeline=%dx%d blob=%dx%d -> %zu bytes",
-                                      dev->pipeline_width, dev->pipeline_height,
-                                      blobW, blobH, jpegSize);
-                            } else {
-                                ALOGE("JPEG encode failed: %d", ret);
-                            }
-                            grallocModule->unlock(grallocModule, handle);
-                        });
-                    } else if (captureRet == -EAGAIN) {
+                buffer_handle_t handle = *outBuf.buffer;
+                void* vaddr = nullptr;
+
+                int fence = outBuf.acquire_fence;
+                if (fence >= 0) close(fence);
+
+                ALOGI("Processing output %u: frame=%llu stream=%dx%d format=%d",
+                      i, (unsigned long long)request->frame_number,
+                      outBuf.stream->width, outBuf.stream->height, outBuf.stream->format);
+
+                if (outBuf.stream->format == HAL_PIXEL_FORMAT_BLOB) {
+                    uint32_t rgbaSize = dev->pipeline_width * dev->pipeline_height * 4;
+                    if (!dev->temp_rgba || dev->temp_rgba_size < rgbaSize) {
+                        if (dev->temp_rgba) free(dev->temp_rgba);
+                        dev->temp_rgba = (uint8_t*)malloc(rgbaSize);
+                        dev->temp_rgba_size = rgbaSize;
+                    }
+                    if (!dev->temp_rgba) {
+                        ALOGE("Failed to allocate temp RGBA buffer");
+                    } else {
+                        int captureRet = pipeline->captureFrame(dev->temp_rgba, HAL_PIXEL_FORMAT_RGBA_8888);
+                        if (captureRet == 0) {
+                            uint32_t blobW = outBuf.stream->width;
+                            uint32_t blobH = outBuf.stream->height;
+                            run_guarded([&]() {
+                                int ret = grallocModule->lock(grallocModule, handle,
+                                                               GRALLOC_USAGE_SW_WRITE_OFTEN,
+                                                               0, 0, blobW, blobH, &vaddr);
+                                if (ret != 0 || !vaddr) {
+                                    ALOGE("Failed to lock BLOB buffer");
+                                    return;
+                                }
+                                if (!dev->jpeg_encoder) {
+                                    dev->jpeg_encoder = new mocha::JpegEncoder();
+                                }
+                                size_t jpegSize = 0;
+                                uint32_t blobSize = blobW * blobH * 2;
+                                ret = dev->jpeg_encoder->encodeRGBA(dev->temp_rgba,
+                                                                     dev->pipeline_width, dev->pipeline_height,
+                                                                     90, (uint8_t*)vaddr, blobSize, &jpegSize);
+                                if (ret == 0 && jpegSize > 0) {
+                                    camera3_jpeg_blob_t blob;
+                                    blob.jpeg_blob_id = CAMERA3_JPEG_BLOB_ID;
+                                    blob.jpeg_size = jpegSize;
+                                    uint8_t* blobPtr = (uint8_t*)vaddr + blobSize - sizeof(blob);
+                                    memcpy(blobPtr, &blob, sizeof(blob));
+                                    frameCaptured = true;
+                                    ALOGI("JPEG captured: pipeline=%dx%d blob=%dx%d -> %zu bytes",
+                                          dev->pipeline_width, dev->pipeline_height,
+                                          blobW, blobH, jpegSize);
+                                } else {
+                                    ALOGE("JPEG encode failed: %d", ret);
+                                }
+                                grallocModule->unlock(grallocModule, handle);
+                            });
+                        } else if (captureRet == -EAGAIN) {
+                            if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
+                            return -EAGAIN;
+                        } else {
+                            ALOGE("Failed to capture frame for JPEG: %d", captureRet);
+                        }
+                    }
+                } else if (outBuf.stream->format == HAL_PIXEL_FORMAT_YCBCR_420_888) {
+                    struct android_ycbcr ycbcr;
+                    memset(&ycbcr, 0, sizeof(ycbcr));
+                    int captureRet = 0;
+                    run_guarded([&]() {
+                        int ret = grallocModule->lock_ycbcr(grallocModule, handle,
+                                                            GRALLOC_USAGE_SW_WRITE_OFTEN,
+                                                            0, 0, outBuf.stream->width, outBuf.stream->height, &ycbcr);
+                        if (ret != 0 || !ycbcr.y) {
+                            return;
+                        }
+                        captureRet = pipeline->captureFrame(static_cast<uint8_t*>(ycbcr.y), outBuf.stream->format);
+                        if (captureRet == 0) {
+                            frameCaptured = true;
+                        }
+                        grallocModule->unlock(grallocModule, handle);
+                    });
+                    if (captureRet == -EAGAIN) {
                         if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
                         return -EAGAIN;
-                    } else {
-                        ALOGE("Failed to capture frame for JPEG: %d", captureRet);
                     }
-                }
-            } else if (buf.stream->format == HAL_PIXEL_FORMAT_YCBCR_420_888) {
-                struct android_ycbcr ycbcr;
-                memset(&ycbcr, 0, sizeof(ycbcr));
-                int captureRet = 0;
-                run_guarded([&]() {
-                    int ret = grallocModule->lock_ycbcr(grallocModule, handle,
-                                                        GRALLOC_USAGE_SW_WRITE_OFTEN,
-                                                        0, 0, buf.stream->width, buf.stream->height, &ycbcr);
-                    if (ret != 0 || !ycbcr.y) {
-                        return;
+                } else {
+                    int usage = GRALLOC_USAGE_SW_WRITE_OFTEN;
+                    int captureRet = 0;
+                    run_guarded([&]() {
+                        int ret = grallocModule->lock(grallocModule, handle, usage,
+                                                      0, 0, outBuf.stream->width, outBuf.stream->height, &vaddr);
+                        if (ret != 0 || !vaddr) {
+                            return;
+                        }
+                        captureRet = pipeline->captureFrame(static_cast<uint8_t*>(vaddr), outBuf.stream->format);
+                        if (captureRet == 0) {
+                            frameCaptured = true;
+                        }
+                        grallocModule->unlock(grallocModule, handle);
+                    });
+                    if (captureRet == -EAGAIN) {
+                        if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
+                        return -EAGAIN;
                     }
-                    captureRet = pipeline->captureFrame(static_cast<uint8_t*>(ycbcr.y), buf.stream->format);
-                    if (captureRet == 0) {
-                        frameCaptured = true;
-                    }
-                    grallocModule->unlock(grallocModule, handle);
-                });
-                if (captureRet == -EAGAIN) {
-                    if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
-                    return -EAGAIN;
-                }
-            } else {
-                int usage = GRALLOC_USAGE_SW_WRITE_OFTEN;
-                int captureRet = 0;
-                run_guarded([&]() {
-                    int ret = grallocModule->lock(grallocModule, handle, usage,
-                                                  0, 0, buf.stream->width, buf.stream->height, &vaddr);
-                    if (ret != 0 || !vaddr) {
-                        return;
-                    }
-                    captureRet = pipeline->captureFrame(static_cast<uint8_t*>(vaddr), buf.stream->format);
-                    if (captureRet == 0) {
-                        frameCaptured = true;
-                    }
-                    grallocModule->unlock(grallocModule, handle);
-                });
-                if (captureRet == -EAGAIN) {
-                    if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
-                    return -EAGAIN;
-                }
-            }
-
-            // Fan the captured frame out to every other output stream (preview + video).
-            // The framework configures TWO output streams during recording (preview + video);
-            // we only captured into output_buffers[0], so copy it to the rest.
-            if (frameCaptured && buf.stream->format != HAL_PIXEL_FORMAT_BLOB) {
-                for (uint32_t i = 1; i < request->num_output_buffers; i++) {
-                    copyFrameBetweenBuffers(grallocModule, &buf, &request->output_buffers[i]);
                 }
             }
         }
