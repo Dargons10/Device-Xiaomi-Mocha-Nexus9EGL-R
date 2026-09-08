@@ -17,7 +17,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # BT
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.bt.bdaddr_path=/system/vendor/etc/mocha_btmacaddr.txt
+    ro.bt.bdaddr_path=/data/mocha_btmacaddr.txt
 
 # Dalvik
 PRODUCT_PROPERTY_OVERRIDES += \

@@ -20,7 +20,7 @@ checkBkbPartition() {
 generateBtMac() {
 	echo "$TAG: generating bt mac address"
 	local btMac="${md5serialno:3:2}:${md5serialno:16:2}:${md5serialno:17:2}:${md5serialno:9:2}:${md5serialno:11:2}:${md5serialno:13:2}"
-	local macFile="/data/local/mocha_btmacaddr.txt"
+	local macFile="/data/mocha_btmacaddr.txt"
 	mkdir -p /data/local
 	echo $btMac > $macFile
 	chmod 644 $macFile
@@ -33,7 +33,7 @@ generateBtMac() {
 generateWifiMac() {
 	echo "$TAG: generating wifi mac address"
 	local wifiMac="0c:1d:${md5serialno:7:2}:${md5serialno:9:2}:${md5serialno:11:2}:${md5serialno:14:2}"
-	local macFile="/data/local/mocha_macaddr.txt"
+	local macFile="/data/mocha_macaddr.txt"
 	echo $wifiMac > $macFile
 	chmod 644 $macFile
 }
