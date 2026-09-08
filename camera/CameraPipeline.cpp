@@ -550,10 +550,10 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
     float rGain = avgG / avgR;
     float bGain = avgG / avgB;
 
-    rGain = (rGain < 0.5f) ? 0.5f : (rGain > 3.0f) ? 3.0f : rGain;
-    bGain = (bGain < 0.5f) ? 0.5f : (bGain > 3.0f) ? 3.0f : bGain;
+    rGain = (rGain < 0.7f) ? 0.7f : (rGain > 1.4f) ? 1.4f : rGain;
+    bGain = (bGain < 0.7f) ? 0.7f : (bGain > 1.4f) ? 1.4f : bGain;
 
-    float alpha = 0.3f;
+    float alpha = 0.15f;
     if (!mHasAwbInit) {
         mAwbGains[0] = rGain;
         mAwbGains[2] = bGain;
