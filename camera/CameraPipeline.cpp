@@ -559,8 +559,20 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
         mAwbGains[2] = bGain;
         mHasAwbInit = true;
     } else {
-        mAwbGains[0] = mAwbGains[0] * (1.0f - alpha) + rGain * alpha;
-        mAwbGains[2] = mAwbGains[2] * (1.0f - alpha) + bGain * alpha;
+        /* Outlier rejection: if the new sample differs from the current
+           gains by more than 25%, it is likely a corrupted frame from
+           the VIC driver (sync_to_fence errors). Ignore it. */
+        float rDiff = (rGain > mAwbGains[0]) ? (rGain - mAwbGains[0]) : (mAwbGains[0] - rGain);
+        float bDiff = (bGain > mAwbGains[2]) ? (bGain - mAwbGains[2]) : (mAwbGains[2] - bGain);
+        float rThresh = mAwbGains[0] * 0.25f;
+        float bThresh = mAwbGains[2] * 0.25f;
+        if (rDiff > rThresh || bDiff > bThresh) {
+            ALOGW("AWB: outlier rejected R=%.2f B=%.2f (cur R=%.2f B=%.2f)",
+                  rGain, bGain, mAwbGains[0], mAwbGains[2]);
+        } else {
+            mAwbGains[0] = mAwbGains[0] * (1.0f - alpha) + rGain * alpha;
+            mAwbGains[2] = mAwbGains[2] * (1.0f - alpha) + bGain * alpha;
+        }
     }
     mAwbGains[1] = 1.0f;
     mAwbGains[3] = 1.0f;
