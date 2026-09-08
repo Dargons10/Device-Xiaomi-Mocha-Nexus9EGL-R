@@ -113,24 +113,46 @@ static std::thread gThread;
 
 static void loop() {
     while (true) {
-        usleep(5000000); // 5 seconds
+        usleep(15000000); // 15 seconds
 
         DIR* dir = opendir("/proc/self/fd");
         if (!dir) continue;
 
-        int closed = 0;
+        // Pass 1: count sync_fence fds
+        int fenceCount = 0;
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
             if (entry->d_name[0] == '.') continue;
-
             char path[256];
             snprintf(path, sizeof(path), "/proc/self/fd/%s", entry->d_name);
-
             char target[256];
             ssize_t len = readlink(path, target, sizeof(target) - 1);
             if (len <= 0) continue;
             target[len] = '\0';
+            if (strncmp(target, "anon_inode:sync_fence", 21) == 0)
+                fenceCount++;
+        }
 
+        // Only clean up when count exceeds threshold (active fences at 30fps
+        // are ~30-60; 200 is well above that, so we never touch live fences)
+        const int threshold = 200;
+        if (fenceCount <= threshold) {
+            closedir(dir);
+            continue;
+        }
+
+        // Pass 2: close only the excess (fenceCount - threshold)
+        rewinddir(dir);
+        int toClose = fenceCount - threshold;
+        int closed = 0;
+        while ((entry = readdir(dir)) != nullptr && closed < toClose) {
+            if (entry->d_name[0] == '.') continue;
+            char path[256];
+            snprintf(path, sizeof(path), "/proc/self/fd/%s", entry->d_name);
+            char target[256];
+            ssize_t len = readlink(path, target, sizeof(target) - 1);
+            if (len <= 0) continue;
+            target[len] = '\0';
             if (strncmp(target, "anon_inode:sync_fence", 21) == 0) {
                 int fd = atoi(entry->d_name);
                 close(fd);
@@ -140,7 +162,8 @@ static void loop() {
         closedir(dir);
 
         if (closed > 0) {
-            ALOGI("Fence cleanup: closed %d leaked sync_fence fds", closed);
+            ALOGI("Fence cleanup: closed %d leaked sync_fence fds (total was %d, threshold %d)",
+                  closed, fenceCount, threshold);
         }
     }
 }
