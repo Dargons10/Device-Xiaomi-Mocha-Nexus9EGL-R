@@ -101,7 +101,6 @@ on init
     class main
     user root
     group root
-    seclabel u:r:conn_wifi:s0
     oneshot
 
 service bt_loader /system/bin/bt_loader.sh
@@ -110,5 +109,4 @@ service bt_loader /system/bin/bt_loader.sh
     group system
     disabled
     oneshot
-    seclabel u:r:bt_loader:s0
 
