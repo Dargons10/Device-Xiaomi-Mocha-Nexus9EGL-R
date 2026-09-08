@@ -87,9 +87,6 @@ on property:sys.boot_completed=1
     write /dev/cpuset/top-app/mems 0
 
 on init
-    chmod 0775 /system/bin/bt_loader.sh
-    chown root system /system/bin/bt_loader.sh
-    start bt_loader
        
     # Mount a tmpfs into /mnt/tmp for hosting nvram, phs shared memory
     mkdir /mnt/tmp 0770 system system
@@ -107,6 +104,5 @@ service bt_loader /system/bin/bt_loader.sh
     class main
     user root
     group system
-    disabled
     oneshot
 

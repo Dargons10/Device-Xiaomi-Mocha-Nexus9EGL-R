@@ -20,13 +20,12 @@ checkBkbPartition() {
 generateBtMac() {
 	echo "$TAG: generating bt mac address"
 	local btMac="${md5serialno:3:2}:${md5serialno:16:2}:${md5serialno:17:2}:${md5serialno:9:2}:${md5serialno:11:2}:${md5serialno:13:2}"
-	cd /
-	touch /system/vendor/etc/mocha_btmacaddr.txt
-	chmod 755 /system/vendor/etc/mocha_btmacaddr.txt
-	cd /
-	echo $btMac > /system/vendor/etc/mocha_btmacaddr.txt
-	chown bluetooth:bluetooth /system/vendor/etc/mocha_btmacaddr.txt
-	setprop ro.bt.bdaddr_path /system/vendor/etc/mocha_btmacaddr.txt
+	local macFile="/data/local/mocha_btmacaddr.txt"
+	mkdir -p /data/local
+	echo $btMac > $macFile
+	chmod 644 $macFile
+	chown bluetooth:bluetooth $macFile
+	setprop ro.bt.bdaddr_path $macFile
 	setprop persist.service.bdroid.bdaddr $btMac
 	setprop ro.boot.btmacaddr $btMac
 }
@@ -34,21 +33,17 @@ generateBtMac() {
 generateWifiMac() {
 	echo "$TAG: generating wifi mac address"
 	local wifiMac="0c:1d:${md5serialno:7:2}:${md5serialno:9:2}:${md5serialno:11:2}:${md5serialno:14:2}"
-	cd /
-	touch /system/vendor/etc/mocha_macaddr.txt
-	chmod 755 /system/vendor/etc/mocha_macaddr.txt
-	cd /
-	echo $wifiMac > /system/vendor/etc/mocha_macaddr.txt
+	local macFile="/data/local/mocha_macaddr.txt"
+	echo $wifiMac > $macFile
+	chmod 644 $macFile
 }
 
 main() {
 	checkBkbPartition
 
 	if [ "$bkbIsBroken" = 1 ]; then
-		mount -o remount,rw /system
 		generateBtMac
 		generateWifiMac
-		mount -o remount,ro /system
 	else
 		echo "$TAG: BKB partion is not broken"
 	fi;
