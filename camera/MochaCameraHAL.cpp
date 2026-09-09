@@ -243,6 +243,7 @@ struct mocha_camera_device_t {
     bool af_trigger_handled;
 
     const camera3_stream_t* blob_stream;
+    volatile bool closing;
 };
 
 // Initialize static camera characteristics
@@ -772,6 +773,7 @@ static int camera_device_close(hw_device_t *device) {
     }
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
+    dev->closing = true;
 
     if (dev->jpeg_encoder) {
         delete dev->jpeg_encoder;
@@ -957,9 +959,9 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
       // Auto Exposure y Auto White Balance
       // OV2710 (front) does not support V4L2_CID_EXPOSURE/GAIN (EIO).
       // Disable AE/AWB for front camera; keep for back (IMX179).
-      pipelineConfig.enableAE = (dev->camera_id == 0);
-      pipelineConfig.enableAWB = (dev->camera_id == 0);
-    pipelineConfig.targetLuma = 0.55f;
+       pipelineConfig.enableAE = (dev->camera_id == 0);
+       pipelineConfig.enableAWB = (dev->camera_id == 0);
+    pipelineConfig.targetLuma = 0.42f;
       pipelineConfig.digitalGain = 1.0f;  // raw10_to_8bit already outputs correct 8-bit scale
  
     // Override IMPLEMENTATION_DEFINED to RGBA_8888 (Tegra gralloc allocates
@@ -1335,7 +1337,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
     ALOGI("camera_device_process_capture_request: frame_number=%llu", (unsigned long long)request->frame_number);
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
-    
+
+    if (dev->closing) {
+        return -ENOSYS;
+    }
+
     if (!dev->is_initialized || !dev->callback_ops) {
         ALOGE("Camera not initialized");
         return -ENOSYS;
@@ -1394,6 +1400,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
 
     bool frameCaptured = false;
     bool hasBlobOutput = false;
+
+    if (dev->closing) {
+        if (dev->inflight_tracker) dev->inflight_tracker->remove(frameNum);
+        return -ENOSYS;
+    }
 
     if (dev->pipeline && dev->streams_configured) {
         mocha::CameraPipeline* pipeline = static_cast<mocha::CameraPipeline*>(dev->pipeline);

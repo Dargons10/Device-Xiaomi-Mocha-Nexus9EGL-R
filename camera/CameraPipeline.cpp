@@ -533,9 +533,15 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
     for (int y = 0; y < h; y += step) {
         for (int x = 0; x < w; x += step) {
             int off = (y * w + x) * 3;
-            sumR += rgbBuffer[off];
-            sumG += rgbBuffer[off+1];
-            sumB += rgbBuffer[off+2];
+            int r = rgbBuffer[off];
+            int g = rgbBuffer[off+1];
+            int b = rgbBuffer[off+2];
+            /* Skip clipped (bright) and very dark pixels for accurate AWB */
+            int lum = r + g + b;
+            if (lum < 60 || lum > 690) continue;
+            sumR += r;
+            sumG += g;
+            sumB += b;
             pixelCount++;
         }
     }
@@ -550,8 +556,8 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
     float rGain = avgG / avgR;
     float bGain = avgG / avgB;
 
-    rGain = (rGain < 0.7f) ? 0.7f : (rGain > 1.4f) ? 1.4f : rGain;
-    bGain = (bGain < 0.7f) ? 0.7f : (bGain > 1.4f) ? 1.4f : bGain;
+    rGain = (rGain < 0.85f) ? 0.85f : (rGain > 1.25f) ? 1.25f : rGain;
+    bGain = (bGain < 0.85f) ? 0.85f : (bGain > 1.25f) ? 1.25f : bGain;
 
     float alpha = 0.15f;
     if (!mHasAwbInit) {
@@ -559,20 +565,8 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
         mAwbGains[2] = bGain;
         mHasAwbInit = true;
     } else {
-        /* Outlier rejection: if the new sample differs from the current
-           gains by more than 25%, it is likely a corrupted frame from
-           the VIC driver (sync_to_fence errors). Ignore it. */
-        float rDiff = (rGain > mAwbGains[0]) ? (rGain - mAwbGains[0]) : (mAwbGains[0] - rGain);
-        float bDiff = (bGain > mAwbGains[2]) ? (bGain - mAwbGains[2]) : (mAwbGains[2] - bGain);
-        float rThresh = mAwbGains[0] * 0.25f;
-        float bThresh = mAwbGains[2] * 0.25f;
-        if (rDiff > rThresh || bDiff > bThresh) {
-            ALOGW("AWB: outlier rejected R=%.2f B=%.2f (cur R=%.2f B=%.2f)",
-                  rGain, bGain, mAwbGains[0], mAwbGains[2]);
-        } else {
-            mAwbGains[0] = mAwbGains[0] * (1.0f - alpha) + rGain * alpha;
-            mAwbGains[2] = mAwbGains[2] * (1.0f - alpha) + bGain * alpha;
-        }
+        mAwbGains[0] = mAwbGains[0] * (1.0f - alpha) + rGain * alpha;
+        mAwbGains[2] = mAwbGains[2] * (1.0f - alpha) + bGain * alpha;
     }
     mAwbGains[1] = 1.0f;
     mAwbGains[3] = 1.0f;
@@ -728,6 +722,23 @@ int CameraPipeline::processBayerToYuv(const uint8_t* bayerData, uint8_t* output,
 
     mDemosaic->process(bayerData, mRgbBuffer);
 
+    /* Debug: log RGB stats after demosaic */
+    {
+        static int dbgCount = 0;
+        if (++dbgCount % 100 == 0) {
+            int total = mConfig.width * mConfig.height;
+            uint64_t sr=0, sg=0, sb=0;
+            for (int i = 0; i < total; i += 100) {
+                sr += mRgbBuffer[i*3];
+                sg += mRgbBuffer[i*3+1];
+                sb += mRgbBuffer[i*3+2];
+            }
+            int n = total / 100;
+            ALOGI("PIPELINE debug: post-demosaic R=%.1f G=%.1f B=%.1f (digitalGain=%.2f)",
+                  (float)sr/n, (float)sg/n, (float)sb/n, mConfig.digitalGain);
+        }
+    }
+
     /* AE update before applying gains */
     if (mConfig.enableAE)
         doAutoExposure(mRgbBuffer);
@@ -739,6 +750,9 @@ int CameraPipeline::processBayerToYuv(const uint8_t* bayerData, uint8_t* output,
     float rG = (mConfig.enableAWB ? mAwbGains[0] : mConfig.wbGain[0]) * mConfig.digitalGain;
     float gG = (mConfig.enableAWB ? mAwbGains[1] : mConfig.wbGain[1]) * mConfig.digitalGain;
     float bG = (mConfig.enableAWB ? mAwbGains[2] : mConfig.wbGain[2]) * mConfig.digitalGain;
+    /* Post-AWB color correction: reduce purple tint (R-5%, G+3%) */
+    rG *= 0.95f;
+    gG *= 1.03f;
 
     if (outputFormat == HAL_PIXEL_FORMAT_YCBCR_420_888) {
         /* For YUV: apply WB gains in-place first, then gamma, then convert */
