@@ -299,7 +299,8 @@ PRODUCT_PACKAGES += \
     ussr_setup 
 
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh
+    $(LOCAL_PATH)/initfiles/init.renderer.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.renderer.sh \
+    $(LOCAL_PATH)/initfiles/storage_watchdog.sh:$(TARGET_COPY_OUT_VENDOR)/bin/storage_watchdog.sh
 
 # Sensors
 PRODUCT_PACKAGES += \

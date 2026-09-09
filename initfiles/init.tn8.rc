@@ -93,3 +93,15 @@ on property:ro.radio.noril=true
 on property:sys.boot_completed=1
     exec -- /system/bin/settings put global device_provisioned 1
 
+# Storage FUSE watchdog: restarts vold if emulated storage becomes inaccessible
+on boot
+    chmod 0755 /vendor/bin/storage_watchdog.sh
+
+service storage_watchdog /vendor/bin/storage_watchdog.sh
+    user root
+    group root
+    oneshot
+    disabled
+    on property:sys.boot_completed=1
+        start storage_watchdog
+
