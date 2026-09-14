@@ -44,7 +44,7 @@ namespace mocha {
 // Camera configurations
 const MochaCameraInfo MochaCameraHAL::kCameras[] = {
     { 0, "IMX179", CAMERA_FACING_BACK, 90, 3280, false },
-    { 1, "OV2710", CAMERA_FACING_FRONT, 270, 1944, false },
+    { 1, "OV5693", CAMERA_FACING_FRONT, 270, 2592, false },
 };
 
 const int MochaCameraHAL::kNumCameras = sizeof(MochaCameraHAL::kCameras) / sizeof(MochaCameraHAL::kCameras[0]);
