@@ -499,19 +499,19 @@ void CameraPipeline::doAutoExposure(const uint8_t* rgbBuffer) {
     int newGain = mCurrentGain;
 
     /* Prefer longer exposure over higher gain to reduce noise */
-    if (newExp > 2000) {
-        newGain = (int)(mCurrentGain * (newExp / 2000.0f));
-        newExp = 2000;
-    } else if (newGain > 100 && newExp < 2000) {
+    if (newExp > 8000) {
+        newGain = (int)(mCurrentGain * (newExp / 8000.0f));
+        newExp = 8000;
+    } else if (newGain > 100 && newExp < 8000) {
         /* If gain is high, increase exposure instead */
         newExp = (int)(newExp * (newGain / 100.0f));
         newGain = 100;
-        if (newExp > 2000) newExp = 2000;
+        if (newExp > 8000) newExp = 8000;
     }
     if (newExp < 10) {
         newExp = 10;
     }
-    if (newGain > 120) newGain = 120;
+    if (newGain > 240) newGain = 240;
     if (newGain < 1) newGain = 1;
 
     if (newExp != mCurrentExposure || newGain != mCurrentGain) {
