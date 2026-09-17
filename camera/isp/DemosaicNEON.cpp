@@ -17,6 +17,22 @@ DemosaicNEON::~DemosaicNEON() {
 int DemosaicNEON::initialize(const DemosaicParams& params) {
     if (params.width == 0 || params.height == 0) return -1;
     mParams = params;
+
+    /* Build black-level / white-level normalization LUT.
+       raw10_to_8bit yields val10>>2 in [0,255] (8-bit domain). Subtract the
+       black level and stretch to full range: out = (v-bl) * 255 / (wl-bl). */
+    int bl = params.blackLevel;
+    int wl = params.whiteLevel ? params.whiteLevel : 255;
+    int den = wl - bl;
+    if (den < 1) den = 1;
+    for (int i = 0; i < 256; i++) {
+        int v = i - bl;
+        if (v < 0) v = 0;
+        v = (v * 255) / den;
+        if (v > 255) v = 255;
+        mNormLut[i] = (uint8_t)v;
+    }
+
     uint32_t needed = params.width * params.height + 16;
     if (needed > mBayerBufSize) {
         uint8_t* buf = (uint8_t*)realloc(mBayerBuf, needed + 64);
@@ -28,29 +44,15 @@ int DemosaicNEON::initialize(const DemosaicParams& params) {
     return 0;
 }
 
-static void raw10_to_8bit(const uint8_t* in, uint8_t* out, int total, uint16_t bl) {
-    /* Kernel V4L2 driver stores 10-bit values MSB-first in 16-bit containers.
-       Example: val10=260 → memory bytes 0x41 0x00 (BE: 0x4100).
-       ARM LE reads as uint16: 0x0041 = 65. The meaningful data is in the
-       low byte of the LE read (v & 0xFF), which is the high byte of the
-       original big-endian storage. */
-    int i = 0;
-    uint8x16_t blv = vdupq_n_u8(bl);
-    for (; i + 16 <= total; i += 16) {
-        uint16_t tmp[16];
-        memcpy(tmp, in + i * 2, 32);
-        uint16x8_t a = vld1q_u16(tmp);
-        uint16x8_t b = vld1q_u16(tmp + 8);
-        /* Kernel stores 10-bit val MSB-first in 16-bit container.
-           ARM LE read puts meaningful byte in low position: v & 0xFF. */
-        uint8x16_t v = vcombine_u8(vmovn_u16(a), vmovn_u16(b));
-        vst1q_u8(out + i, vqsubq_u8(v, blv));
-    }
-    for (; i < total; i++) {
-        uint16_t v;
-        memcpy(&v, in + i * 2, 2);
-        int p = (v & 0xFF) - bl;
-        out[i] = p > 0 ? (uint8_t)p : 0;
+static void raw10_to_8bit(const uint8_t* in, uint8_t* out, int total, const uint8_t* lut) {
+    /* The VI (T_R16_I + CSI DT_RAW10) stores each 10-bit sample RIGHT-ALIGNED
+       in a little-endian 16-bit word: val10 = v & 0x3FF (0..1023). Convert to
+       8-bit with v >> 2, then apply the black/white-level LUT.
+       Reading only the low byte (& 0xFF) mod-wraps every val10 > 255,
+       scrambling highlights into magenta/cyan speckle (the color bug). */
+    for (int i = 0; i < total; i++) {
+        uint32_t v = ((uint32_t)in[i*2] | ((uint32_t)in[i*2+1] << 8)) & 0x3FF;
+        out[i] = lut[v >> 2];
     }
 }
 
@@ -360,7 +362,7 @@ void DemosaicNEON::process(const uint8_t* bayerInput, uint8_t* rgbOutput) {
     const int ox = mParams.offset_x & 1;
     const int pat = mParams.bayerPattern;
 
-    raw10_to_8bit(bayerInput, mBayerBuf, w * h, mParams.blackLevel);
+    raw10_to_8bit(bayerInput, mBayerBuf, w * h, mNormLut);
     const uint8_t* b8 = mBayerBuf;
 
     static const uint8_t pos_color[4][4] = {

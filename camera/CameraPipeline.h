@@ -28,7 +28,8 @@ struct PipelineConfig {
     uint8_t offset_y;
     bool flipV;
     bool enableISP;
-    uint16_t blackLevel;
+    uint16_t blackLevel;   // 8-bit domain
+    uint16_t whiteLevel;   // 8-bit domain, default 255
     float wbGain[4];
     float ccm[9];
     float gamma;

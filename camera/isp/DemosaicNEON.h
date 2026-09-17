@@ -17,7 +17,8 @@ struct DemosaicParams {
     uint8_t  bayerPattern;  // 0=GBRG, 1=GRBG, 2=BGGR, 3=RGGB
     uint8_t  offset_x;      // X offset for pattern alignment
     uint8_t  offset_y;      // Y offset for pattern alignment
-    uint16_t blackLevel;
+    uint16_t blackLevel;    // 8-bit domain (raw10>>2)
+    uint16_t whiteLevel;    // 8-bit domain, default 255
 };
 
 class DemosaicNEON {
@@ -38,6 +39,7 @@ private:
     bool mInitialized;
     uint8_t* mBayerBuf;
     uint32_t mBayerBufSize;
+    uint8_t mNormLut[256];  // black-level subtract + white-level normalize
 };
 
 } // namespace mocha

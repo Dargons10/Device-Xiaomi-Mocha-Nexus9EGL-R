@@ -359,6 +359,7 @@ int CameraPipeline::configure(const PipelineConfig& config) {
         demosaicParams.offset_x = config.offset_x;
         demosaicParams.offset_y = config.offset_y;
         demosaicParams.blackLevel = config.blackLevel;
+        demosaicParams.whiteLevel = config.whiteLevel ? config.whiteLevel : 255;
 
         mDemosaic = std::unique_ptr<DemosaicNEON>(new DemosaicNEON());
         int ret = mDemosaic->initialize(demosaicParams);
