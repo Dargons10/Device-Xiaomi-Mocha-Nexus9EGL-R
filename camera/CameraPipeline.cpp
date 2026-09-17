@@ -4,6 +4,7 @@
 #include <cstring>
 #include <system/graphics.h>
 #include <cutils/log.h>
+#include <cutils/properties.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -107,6 +108,14 @@ CameraPipeline::CameraPipeline()
       mCurrentBuffer(0),
     mCurrentExposure(800),
     mCurrentGain(60),
+    mExposureStepLines(0),
+    mMainHalfNs(10000000),
+    mVtsLines(2510),
+    mLinePeriodNs(0),
+    mFramePeriodNs(0),
+    mPrevFrameTsNs(0),
+    mDeltaCount(0),
+    mTimingFrozen(false),
       mHasAwbInit(false),
       mLastGamma(0.0f),
       mFocusPosition(0),
@@ -269,12 +278,47 @@ int CameraPipeline::getGain() {
     return mCurrentGain;
 }
 
+int64_t CameraPipeline::getExposureNs() const {
+    int64_t lineNs = mLinePeriodNs > 0 ? mLinePeriodNs : 15780; /* ~25.2fps@VTS2510 */
+    return (int64_t)mCurrentExposure * lineNs;
+}
+
 int CameraPipeline::configure(const PipelineConfig& config) {
     if (mState == PIPELINE_STREAMING) {
         return -EBUSY;
     }
 
     mConfig = config;
+
+    /* Anti-banding setup. VTS is the vertical total size of the active
+       sensor mode (back IMX179 1280x720 binning = 0x09CE = 2510 lines;
+       front OV5693 1280x720 = its own total). The mains half-period is
+       10 ms @ 50 Hz (Spain/EU) or 8.333 ms @ 60 Hz (US). Override with
+       persist.vendor.camera.antibanding = auto|50|60|off (default auto-50). */
+    mVtsLines = 2510;  /* IMX179 frame length regs 0x0340/0x0341 = 0x09CE */
+    mTimingFrozen = false;
+    mDeltaCount = 0;
+    mPrevFrameTsNs = 0;
+    mFramePeriodNs = 0;
+    mLinePeriodNs = 0;
+    mExposureStepLines = 0;
+    mMainHalfNs = 0;
+    char abProp[PROPERTY_VALUE_MAX];
+    property_get("persist.vendor.camera.antibanding", abProp, "auto");
+    if (mCameraId != 0) {
+        /* Front OV5693: this minimal kernel driver does not expose a
+           documented exposure-unit scale, and the sensor does not show
+           banding (its I2C timing is fixed). Leave exposure unquantized. */
+        ALOGI("Anti-banding: front camera, exposure quantization disabled");
+    } else if (!strcmp(abProp, "off") || !strcmp(abProp, "0")) {
+        ALOGI("Anti-banding: OFF (exposure not quantized)");
+    } else {
+        int mainsHz = 50;
+        if (!strcmp(abProp, "60")) mainsHz = 60;
+        mMainHalfNs = 500000000LL / mainsHz;  /* half-period ns */
+        ALOGI("Anti-banding: %d Hz (target half-period %lld ns, VTS %d)",
+              mainsHz, (long long)mMainHalfNs, mVtsLines);
+    }
 
     if (mFd < 0) {
         return -ENODEV;
@@ -492,27 +536,48 @@ void CameraPipeline::doAutoExposure(const uint8_t* rgbBuffer) {
     float avgLuma = (float)sum / count / 255.0f;
     float target = mConfig.targetLuma;
 
+    /* Deadband: do nothing within +/-12% of target. Without this the AE
+       wrote 1-line exposure tweaks every frame and the visible brightness
+       jittered at frame rate (looked like flicker even in static scenes). */
+    if (avgLuma > target * 0.88f && avgLuma < target * 1.12f) return;
+
+    /* Damped correction: max +/-1.7x effective exposure per frame so the
+       loop converges monotonically instead of overshoot-hunting. */
     float ratio = target / (avgLuma > 0.001f ? avgLuma : 0.001f);
-    ratio = (ratio < 0.25f) ? 0.25f : (ratio > 8.0f) ? 8.0f : ratio;
+    if (ratio < 0.6f) ratio = 0.6f;
+    if (ratio > 1.7f) ratio = 1.7f;
 
-    int newExp = (int)(mCurrentExposure * ratio);
+    /* Kernel IMX179 control range is [1, 2500] lines; values beyond that
+       used to be silently rejected (ERANGE) and the AE stuck at the last
+       accepted value. */
+    const int expMin = 10, expMax = 2500;
+    const int gainMin = 1, gainMax = 240;
+
+    long newEff = (long)(mCurrentExposure * (float)mCurrentGain * ratio);
+    int newExp = (int)(newEff / mCurrentGain + 0.5f);
     int newGain = mCurrentGain;
+    if (newExp > expMax) {
+        newExp = expMax;
+        newGain = (int)(newEff / expMax + 0.5f);
+    } else if (newExp < expMin) {
+        newExp = expMin;
+        newGain = (int)(newEff / expMin + 0.5f);
+    }
+    if (newGain < gainMin) newGain = gainMin;
+    if (newGain > gainMax) newGain = gainMax;
 
-    /* Prefer longer exposure over higher gain to reduce noise */
-    if (newExp > 8000) {
-        newGain = (int)(mCurrentGain * (newExp / 8000.0f));
-        newExp = 8000;
-    } else if (newGain > 100 && newExp < 8000) {
-        /* If gain is high, increase exposure instead */
-        newExp = (int)(newExp * (newGain / 100.0f));
-        newGain = 100;
-        if (newExp > 8000) newExp = 8000;
+    /* Anti-banding: snap exposure to an integer number of mains
+       half-cycles. Quantizing after the gain pass keeps the product within
+       one step of the requested value (inside the deadband on the next
+       frame, so it holds). */
+    if (mMainHalfNs > 0 && mExposureStepLines > 1) {
+        int s = mExposureStepLines;
+        int q = ((newExp + s / 2) / s) * s;
+        int qMax = (expMax / s) * s;
+        if (q > qMax) q = qMax;
+        if (q < s) q = s;
+        newExp = q;
     }
-    if (newExp < 10) {
-        newExp = 10;
-    }
-    if (newGain > 240) newGain = 240;
-    if (newGain < 1) newGain = 1;
 
     if (newExp != mCurrentExposure || newGain != mCurrentGain) {
         if (newGain != mCurrentGain) setGain(newGain);
@@ -653,6 +718,55 @@ int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
         }
         ALOGE("captureFrame: DQBUF error: %s", strerror(errno));
         return -errno;
+    }
+
+    /* Measure the real frame period from V4L2 buffer timestamps so exposure
+       lines can be converted to ns and quantized to the mains half-period.
+       Requests run on several binder threads, so consecutive DQBUF deltas
+       carry processing jitter: use the MEDIAN of the first 12 deltas and
+       then freeze the estimate (a moving average made the quantization step
+       bounce and re-snap the exposure every few frames). */
+    if (!mTimingFrozen) {
+        int64_t tsNs = (int64_t)buf.timestamp.tv_sec * 1000000000LL
+                     + (int64_t)buf.timestamp.tv_usec * 1000LL;
+        int64_t delta = tsNs - mPrevFrameTsNs;
+        mPrevFrameTsNs = tsNs;
+        if (delta > 5000000LL && delta < 200000000LL) {
+            if (mDeltaCount < (int)(sizeof(mTsDeltas)/sizeof(mTsDeltas[0])))
+                mTsDeltas[mDeltaCount++] = delta;
+            if (mDeltaCount >= 12) {
+                int64_t sorted[16];
+                for (int i = 0; i < mDeltaCount; i++) {
+                    sorted[i] = mTsDeltas[i];
+                    int j = i;
+                    while (j > 0 && sorted[j-1] > sorted[j]) {
+                        int64_t t = sorted[j]; sorted[j] = sorted[j-1]; sorted[j-1] = t; j--;
+                    }
+                }
+                mFramePeriodNs = sorted[mDeltaCount / 2];
+                mTimingFrozen = true;
+                mLinePeriodNs = mFramePeriodNs / mVtsLines;
+                if (mMainHalfNs > 0 && mLinePeriodNs > 0) {
+                    int s = (int)((mMainHalfNs + mLinePeriodNs / 2) / mLinePeriodNs);
+                    if (s < 1) s = 1;
+                    mExposureStepLines = s;
+                    int q = ((mCurrentExposure + s / 2) / s) * s;
+                    if (q > 2500) q = (2500 / s) * s;
+                    if (q < s) q = s;
+                    ALOGI("Anti-banding: frame=%lldns line=%lldns step=%d lines (~%.2f ms), "
+                          "snap exposure %d -> %d",
+                          (long long)mFramePeriodNs, (long long)mLinePeriodNs,
+                          s, s * (double)mLinePeriodNs / 1e6, mCurrentExposure, q);
+                    if (q != mCurrentExposure) setExposure(q);
+                } else {
+                    ALOGI("Timing: frame=%lldns line=%lldns (anti-banding off)",
+                          (long long)mFramePeriodNs, (long long)mLinePeriodNs);
+                }
+            }
+        }
+    } else {
+        mPrevFrameTsNs = (int64_t)buf.timestamp.tv_sec * 1000000000LL
+                       + (int64_t)buf.timestamp.tv_usec * 1000LL;
     }
 
     if (buf.index >= mBufferCount) {
