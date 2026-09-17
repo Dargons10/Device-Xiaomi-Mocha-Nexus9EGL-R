@@ -365,11 +365,20 @@ void DemosaicNEON::process(const uint8_t* bayerInput, uint8_t* rgbOutput) {
     raw10_to_8bit(bayerInput, mBayerBuf, w * h, mNormLut);
     const uint8_t* b8 = mBayerBuf;
 
+    /* pos_color[pat][pos] -> type. pos = (rowParity*2 + colParity):
+         0=(even,even) 1=(even,odd) 2=(odd,even) 3=(odd,odd)
+       type: 0=R 1=G1(R=H,B=V) 2=G2(R=V,B=H) 3=B
+       Standard Bayer order:
+         pat0 RGGB: (0,0)=R (0,1)=G1 (1,0)=G2 (1,1)=B
+         pat1 GRBG: (0,0)=G1 (0,1)=R (1,0)=B (1,1)=G2
+         pat2 GBRG: (0,0)=G2 (0,1)=B (1,0)=R (1,1)=G1
+         pat3 BGGR: (0,0)=B (0,1)=G2 (1,0)=G1 (1,1)=R
+    */
     static const uint8_t pos_color[4][4] = {
-        {1, 0, 3, 2}, /* pat 0 = GBRG */
-        {0, 1, 2, 3}, /* pat 1 = GRBG */
-        {2, 3, 0, 1}, /* pat 2 = BGGR */
-        {0, 1, 2, 3}, /* pat 3 = RGGB */
+        {0, 1, 2, 3}, /* pat 0 = RGGB */
+        {1, 0, 3, 2}, /* pat 1 = GRBG */
+        {2, 3, 0, 1}, /* pat 2 = GBRG */
+        {3, 2, 1, 0}, /* pat 3 = BGGR */
     };
 
     for (int y = 1; y < h - 1; y++) {

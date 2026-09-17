@@ -938,31 +938,38 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
     mocha::PipelineConfig pipelineConfig;
     pipelineConfig.width = pipelineStream->width;
     pipelineConfig.height = pipelineStream->height;
-    /* IMX179 (back) = SRGGB10 → RGGB(3). OV2710 (front) = SBGGR10 → BGGR(2). */
-     pipelineConfig.bayerPattern = (dev->camera_id == 0) ? 3 : 2;
+    /* IMX179 (back) = SRGGB10 → RGGB(0). OV5693 (front) = SBGGR10 → BGGR(3). */
+    pipelineConfig.bayerPattern = (dev->camera_id == 0) ? 0 : 3;
     pipelineConfig.offset_x = 0;
     pipelineConfig.offset_y = 0;
     pipelineConfig.flipV = false;  // IMX179 mount normal; framework handles rotation
 
     pipelineConfig.enableISP = true;
 
-     pipelineConfig.blackLevel = 0;  // DEBUG: temp zero to check pixel visibility
-     pipelineConfig.wbGain[0] = 1.0f;  // R gain
-     pipelineConfig.wbGain[1] = 1.0f;  // G gain
-     pipelineConfig.wbGain[2] = 1.0f;  // B gain
-     pipelineConfig.wbGain[3] = 1.0f;
-     pipelineConfig.ccm[0] = 1.0f; pipelineConfig.ccm[1] = 0.0f; pipelineConfig.ccm[2] = 0.0f;
-     pipelineConfig.ccm[3] = 0.0f; pipelineConfig.ccm[4] = 1.0f; pipelineConfig.ccm[5] = 0.0f;
-     pipelineConfig.ccm[6] = 0.0f; pipelineConfig.ccm[7] = 0.0f; pipelineConfig.ccm[8] = 1.0f;
-     pipelineConfig.gamma = 0.55f;
+    /* Black/white level in 8-bit domain (raw10>>2).
+       IMX179 OB=64 (10-bit) -> 16. OV5693 OB=15 (10-bit) -> 3. */
+    pipelineConfig.blackLevel = (dev->camera_id == 0) ? 16 : 3;
+    pipelineConfig.whiteLevel = 255;
+    pipelineConfig.wbGain[0] = 1.0f;  // R gain
+    pipelineConfig.wbGain[1] = 1.0f;  // G gain
+    pipelineConfig.wbGain[2] = 1.0f;  // B gain
+    pipelineConfig.wbGain[3] = 1.0f;
+    /* CCM = identidad (desactivado).
+       La srgbMatrix del tuning NO es post-AWB: rowsum=[1.67,-0.01,1.34]
+       -> aplicada a blanco neutro produce púrpura (G->0). Está pensada para
+       señal RAW junto a su wbGain por CCT. Usamos gray-world AWB (blanco
+       neutro por construcción) + gamma sRGB, que da colores reales sin CCM. */
+    pipelineConfig.ccm[0] = 1.0f; pipelineConfig.ccm[1] = 0.0f; pipelineConfig.ccm[2] = 0.0f;
+    pipelineConfig.ccm[3] = 0.0f; pipelineConfig.ccm[4] = 1.0f; pipelineConfig.ccm[5] = 0.0f;
+    pipelineConfig.ccm[6] = 0.0f; pipelineConfig.ccm[7] = 0.0f; pipelineConfig.ccm[8] = 1.0f;
+    pipelineConfig.gamma = 0.4545f;  /* sRGB-like (1/2.2) */
 
-      // Auto Exposure y Auto White Balance
-      // OV2710 (front) does not support V4L2_CID_EXPOSURE/GAIN (EIO).
-      // Disable AE/AWB for front camera; keep for back (IMX179).
-       pipelineConfig.enableAE = (dev->camera_id == 0);
-       pipelineConfig.enableAWB = (dev->camera_id == 0);
+    // Auto Exposure y Auto White Balance en ambas cámaras.
+    // (El frontal OV5693 usa AE por registros I2C; AWB por gray-world en host.)
+    pipelineConfig.enableAE = true;
+    pipelineConfig.enableAWB = true;
     pipelineConfig.targetLuma = 0.42f;
-      pipelineConfig.digitalGain = 1.0f;  // raw10_to_8bit already outputs correct 8-bit scale
+    pipelineConfig.digitalGain = 1.0f;
  
     // Override IMPLEMENTATION_DEFINED to RGBA_8888 (Tegra gralloc allocates
     // RGBA for non-YUV formats). Keep YCbCr_420_888 and BLOB as-is.
