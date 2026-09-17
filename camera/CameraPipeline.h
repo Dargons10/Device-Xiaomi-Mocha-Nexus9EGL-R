@@ -83,6 +83,8 @@ private:
     int processBayerToYuv(const uint8_t* bayerData, uint8_t* output, uint32_t outputFormat);
     void doAutoExposure(const uint8_t* rgbBuffer);
     void doAutoWhiteBalance(const uint8_t* rgbBuffer);
+    /* Apply WB gains then CCM in float, clamp to [0,255], write back in place. */
+    void applyWbAndCcm(uint8_t* rgb, int total, float rG, float gG, float bG);
 
     int mFd;
     int mSensorFd;

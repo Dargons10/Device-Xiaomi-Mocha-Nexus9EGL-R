@@ -557,8 +557,9 @@ void CameraPipeline::doAutoWhiteBalance(const uint8_t* rgbBuffer) {
     float rGain = avgG / avgR;
     float bGain = avgG / avgB;
 
-    rGain = (rGain < 0.85f) ? 0.85f : (rGain > 1.25f) ? 1.25f : rGain;
-    bGain = (bGain < 0.85f) ? 0.85f : (bGain > 1.25f) ? 1.25f : bGain;
+    /* Wide clamp: incandescent/tungsten needs large B gain (tuning up to ~3.1x). */
+    rGain = (rGain < 0.5f) ? 0.5f : (rGain > 4.0f) ? 4.0f : rGain;
+    bGain = (bGain < 0.5f) ? 0.5f : (bGain > 4.0f) ? 4.0f : bGain;
 
     float alpha = 0.15f;
     if (!mHasAwbInit) {
@@ -751,56 +752,50 @@ int CameraPipeline::processBayerToYuv(const uint8_t* bayerData, uint8_t* output,
     float rG = (mConfig.enableAWB ? mAwbGains[0] : mConfig.wbGain[0]) * mConfig.digitalGain;
     float gG = (mConfig.enableAWB ? mAwbGains[1] : mConfig.wbGain[1]) * mConfig.digitalGain;
     float bG = (mConfig.enableAWB ? mAwbGains[2] : mConfig.wbGain[2]) * mConfig.digitalGain;
-    /* Post-AWB color correction: reduce purple tint (R-5%, G+3%) */
-    rG *= 0.95f;
-    gG *= 1.03f;
+
+    int total = mConfig.width * mConfig.height;
+
+    /* Color science (linear domain): WB gains -> CCM -> clamp, then gamma. */
+    applyWbAndCcm(mRgbBuffer, total, rG, gG, bG);
+    applyGamma(mRgbBuffer, mConfig.width, mConfig.height, mConfig.gamma);
 
     if (outputFormat == HAL_PIXEL_FORMAT_YCBCR_420_888) {
-        /* For YUV: apply WB gains in-place first, then gamma, then convert */
-        {
-            int total = mConfig.width * mConfig.height;
-            if (rG != 1.0f || gG != 1.0f || bG != 1.0f) {
-                for (int i = 0; i < total; i++) {
-                    int off = i * 3;
-                    int r = (int)(mRgbBuffer[off]   * rG);
-                    int g = (int)(mRgbBuffer[off+1] * gG);
-                    int b = (int)(mRgbBuffer[off+2] * bG);
-                    mRgbBuffer[off]   = r > 255 ? 255 : (uint8_t)r;
-                    mRgbBuffer[off+1] = g > 255 ? 255 : (uint8_t)g;
-                    mRgbBuffer[off+2] = b > 255 ? 255 : (uint8_t)b;
-                }
-            }
-        }
-        applyGamma(mRgbBuffer, mConfig.width, mConfig.height, mConfig.gamma);
         uint8_t* yPlane = output;
         uint8_t* uvPlane = output + mConfig.width * mConfig.height;
         mColorConv->rgbToNv12(mRgbBuffer, yPlane, uvPlane);
     } else if (outputFormat == HAL_PIXEL_FORMAT_RGBA_8888 || outputFormat == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-        /* Merged WB + gamma + RGB→RGBA + flip in one pass */
-        mColorConv->rgbToRgbaWbGamma(mRgbBuffer, output,
-                                     mConfig.width, mConfig.height,
-                                     rG, gG, bG, mGammaLut, mConfig.flipV);
+        mColorConv->rgbToRgba(mRgbBuffer, output, mConfig.width, mConfig.height);
+        if (mConfig.flipV) flipVertical(output, mConfig.width, mConfig.height, 4);
     } else {
-        /* For other formats: apply WB and gamma, then raw copy */
-        {
-            int total = mConfig.width * mConfig.height;
-            if (rG != 1.0f || gG != 1.0f || bG != 1.0f) {
-                for (int i = 0; i < total; i++) {
-                    int off = i * 3;
-                    int r = (int)(mRgbBuffer[off]   * rG);
-                    int g = (int)(mRgbBuffer[off+1] * gG);
-                    int b = (int)(mRgbBuffer[off+2] * bG);
-                    mRgbBuffer[off]   = r > 255 ? 255 : (uint8_t)r;
-                    mRgbBuffer[off+1] = g > 255 ? 255 : (uint8_t)g;
-                    mRgbBuffer[off+2] = b > 255 ? 255 : (uint8_t)b;
-                }
-            }
-        }
-        applyGamma(mRgbBuffer, mConfig.width, mConfig.height, mConfig.gamma);
         memcpy(output, mRgbBuffer, mRgbBufferSize);
     }
 
     return 0;
+}
+
+void CameraPipeline::applyWbAndCcm(uint8_t* rgb, int total, float rG, float gG, float bG) {
+    const float* m = mConfig.ccm;
+    /* Identity CCM fast path */
+    bool identity = (m[0]==1.0f && m[4]==1.0f && m[8]==1.0f &&
+                     m[1]==0.0f && m[2]==0.0f && m[3]==0.0f &&
+                     m[5]==0.0f && m[6]==0.0f && m[7]==0.0f);
+    for (int i = 0; i < total; i++) {
+        int off = i * 3;
+        float r = rgb[off]   * rG;
+        float g = rgb[off+1] * gG;
+        float b = rgb[off+2] * bG;
+        float nr, ng, nb;
+        if (identity) {
+            nr = r; ng = g; nb = b;
+        } else {
+            nr = m[0]*r + m[1]*g + m[2]*b;
+            ng = m[3]*r + m[4]*g + m[5]*b;
+            nb = m[6]*r + m[7]*g + m[8]*b;
+        }
+        rgb[off]   = (uint8_t)(nr > 255.0f ? 255 : (nr < 0.0f ? 0 : nr));
+        rgb[off+1] = (uint8_t)(ng > 255.0f ? 255 : (ng < 0.0f ? 0 : ng));
+        rgb[off+2] = (uint8_t)(nb > 255.0f ? 255 : (nb < 0.0f ? 0 : nb));
+    }
 }
 
 int CameraPipeline::initFocuser() {
