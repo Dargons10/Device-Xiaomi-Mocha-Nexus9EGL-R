@@ -119,6 +119,7 @@ CameraPipeline::CameraPipeline()
     mPrevFrameTsNs(0),
     mDeltaCount(0),
     mTimingFrozen(false),
+    mAeHoldFrames(0),
       mHasAwbInit(false),
       mLastGamma(0.0f),
       mFocusPosition(0),
@@ -323,21 +324,17 @@ int CameraPipeline::configure(const PipelineConfig& config) {
     mLinePeriodNs = 0;
     mExposureStepLines = 0;
     mMainHalfNs = 0;
+    mAeHoldFrames = 0;
     char abProp[PROPERTY_VALUE_MAX];
     property_get("persist.vendor.camera.antibanding", abProp, "auto");
-    if (mCameraId != 0) {
-        /* Front OV5693: this minimal kernel driver does not expose a
-           documented exposure-unit scale, and the sensor does not show
-           banding (its I2C timing is fixed). Leave exposure unquantized. */
-        ALOGI("Anti-banding: front camera, exposure quantization disabled");
-    } else if (!strcmp(abProp, "off") || !strcmp(abProp, "0")) {
+    if (!strcmp(abProp, "off") || !strcmp(abProp, "0")) {
         ALOGI("Anti-banding: OFF (exposure not quantized)");
     } else {
         int mainsHz = 50;
         if (!strcmp(abProp, "60")) mainsHz = 60;
         mMainHalfNs = 500000000LL / mainsHz;  /* half-period ns */
-        ALOGI("Anti-banding: %d Hz (target half-period %lld ns, VTS %d)",
-              mainsHz, (long long)mMainHalfNs, mVtsLines);
+        ALOGI("Anti-banding: %d Hz (target half-period %lld ns, VTS %d, units/line %d)",
+              mainsHz, (long long)mMainHalfNs, mVtsLines, mExpUnitsPerLine);
     }
 
     if (mFd < 0) {
@@ -563,10 +560,22 @@ void CameraPipeline::doAutoExposure(const uint8_t* rgbBuffer) {
     float avgLuma = (float)sum / count / 255.0f;
     float target = mConfig.targetLuma;
 
-    /* Deadband: do nothing within +/-12% of target. Without this the AE
+    /* Deadband: do nothing within +/-15% of target. Without this the AE
        wrote 1-line exposure tweaks every frame and the visible brightness
        jittered at frame rate (looked like flicker even in static scenes). */
-    if (avgLuma > target * 0.88f && avgLuma < target * 1.12f) return;
+    if (avgLuma > target * 0.85f && avgLuma < target * 1.15f) {
+        mAeHoldFrames = 0;
+        return;
+    }
+
+    /* Hold: after any change, keep exposure fixed for ~240 ms so the AE
+       cannot toggle between two grid levels while the user re-aims at a
+       light source (that toggling read as flicker). Extreme scene changes
+       (>4x) bypass the hold. */
+    if (mAeHoldFrames > 0) {
+        mAeHoldFrames--;
+        if (avgLuma > target * 0.25f && avgLuma < target * 4.0f) return;
+    }
 
     /* Damped correction: max +/-1.7x effective exposure per frame so the
        loop converges monotonically instead of overshoot-hunting. */
@@ -595,22 +604,34 @@ void CameraPipeline::doAutoExposure(const uint8_t* rgbBuffer) {
     if (newGain > gainMax) newGain = gainMax;
 
     /* Anti-banding: snap exposure to an integer number of mains
-       half-cycles. Quantizing after the gain pass keeps the product within
-       one step of the requested value (inside the deadband on the next
-       frame, so it holds). */
+       half-cycles. The quantization residual is absorbed by the gain
+       below (gain is a DC factor and does not interact with the 100 Hz
+       light), so brightness can track the target smoothly while exposure
+       never leaves the mains grid. */
     if (mMainHalfNs > 0 && mExposureStepLines > 1) {
         int s = mExposureStepLines;
         int q = ((newExp + s / 2) / s) * s;
         int qMax = (expMax / s) * s;
         if (q > qMax) q = qMax;
         if (q < s) q = s;
-        newExp = q;
+        if (q != newExp) {
+            newExp = q;
+            int g = (int)((newEff + newExp / 2) / newExp);
+            int gCapUp = mCurrentGain + mCurrentGain * 7 / 10;
+            int gCapDn = mCurrentGain * 10 / 17;
+            if (g > gCapUp) g = gCapUp;
+            if (g < gCapDn && g < mCurrentGain) g = gCapDn;
+            if (g < gainMin) g = gainMin;
+            if (g > gainMax) g = gainMax;
+            newGain = g;
+        }
     }
 
     if (newExp != mCurrentExposure || newGain != mCurrentGain) {
         if (newGain != mCurrentGain) setGain(newGain);
         if (newExp != mCurrentExposure) setExposure(newExp);
-        ALOGI("AE: luma=%.2f target=%.2f exp=%d(%d) gain=%d(%d)",
+        mAeHoldFrames = 6;
+        ALOGI("AE: luma=%.2f target=%.2f exp=%d(%d) gain=%d(%d) hold",
               avgLuma, target, newExp, mCurrentExposure, newGain, mCurrentGain);
     }
 }
@@ -775,16 +796,18 @@ int CameraPipeline::captureFrame(uint8_t* outputBuffer, uint32_t outputFormat) {
                 mTimingFrozen = true;
                 mLinePeriodNs = mFramePeriodNs / mVtsLines;
                 if (mMainHalfNs > 0 && mLinePeriodNs > 0) {
-                    int s = (int)((mMainHalfNs + mLinePeriodNs / 2) / mLinePeriodNs);
-                    if (s < 1) s = 1;
+                    int lines = (int)((mMainHalfNs + mLinePeriodNs / 2) / mLinePeriodNs);
+                    if (lines < 1) lines = 1;
+                    int s = lines * mExpUnitsPerLine;   /* step in raw V4L2 units */
                     mExposureStepLines = s;
                     int q = ((mCurrentExposure + s / 2) / s) * s;
-                    if (q > 2500) q = (2500 / s) * s;
+                    if (q > mExpMax) q = (mExpMax / s) * s;
                     if (q < s) q = s;
-                    ALOGI("Anti-banding: frame=%lldns line=%lldns step=%d lines (~%.2f ms), "
+                    ALOGI("Anti-banding: frame=%lldns line=%lldns step=%d raw (~%.2f ms), "
                           "snap exposure %d -> %d",
                           (long long)mFramePeriodNs, (long long)mLinePeriodNs,
-                          s, s * (double)mLinePeriodNs / 1e6, mCurrentExposure, q);
+                          s, (double)s * mLinePeriodNs / mExpUnitsPerLine / 1e6,
+                          mCurrentExposure, q);
                     if (q != mCurrentExposure) setExposure(q);
                 } else {
                     ALOGI("Timing: frame=%lldns line=%lldns (anti-banding off)",

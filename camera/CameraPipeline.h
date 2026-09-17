@@ -128,6 +128,7 @@ private:
     int64_t mTsDeltas[16];
     int mDeltaCount;
     bool mTimingFrozen;
+    int mAeHoldFrames;         // AE hold countdown (anti-flicker)
     float mAwbGains[4];
     bool mHasAwbInit;
     uint8_t mGammaLut[256];
