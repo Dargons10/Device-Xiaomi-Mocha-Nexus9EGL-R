@@ -524,7 +524,8 @@ static camera_metadata_t* init_static_characteristics(int cameraId) {
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AE_COMPENSATION_STEP, &ae_comp_step, 1);
 
     // Sensor exposure time range (required)
-    int64_t exposure_time_range[] = { 10000LL, 500000000LL };  // 10us to 500ms
+    /* IMX179 V4L2 exposure control = 10..2500 lines, line ~15.8us */
+    int64_t exposure_time_range[] = { 160000LL, 40000000LL };  // 160us to 40ms
     add_camera_metadata_entry(metadata, ANDROID_SENSOR_INFO_EXPOSURE_TIME_RANGE, exposure_time_range, 2);
 
     // Sensor sensitivity range (required)
@@ -563,9 +564,14 @@ static camera_metadata_t* init_static_characteristics(int cameraId) {
     uint8_t effects[] = { ANDROID_CONTROL_EFFECT_MODE_OFF };
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AVAILABLE_EFFECTS, effects, 1);
 
-    // Available antibanding modes (required)
-    uint8_t antibanding[] = { ANDROID_CONTROL_AE_ANTIBANDING_MODE_OFF };
-    add_camera_metadata_entry(metadata, ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES, antibanding, 1);
+    // Available antibanding modes: we quantize exposure to the mains
+    // half-period inside the AE loop (CameraPipeline anti-banding).
+    uint8_t antibanding[] = {
+        ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO,
+        ANDROID_CONTROL_AE_ANTIBANDING_MODE_50HZ,
+        ANDROID_CONTROL_AE_ANTIBANDING_MODE_60HZ,
+    };
+    add_camera_metadata_entry(metadata, ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES, antibanding, 3);
 
     // Available video stabilization modes (required)
     uint8_t video_stab[] = { ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF };
@@ -1139,7 +1145,7 @@ static const camera_metadata_t* camera_device_construct_default_request_settings
     return metadata;
 }
 
-static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t timestamp, int32_t exposureVal, int32_t sensitivity, int afState, int focusPos) {
+static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t timestamp, int64_t exposureNs, int32_t sensitivity, int afState, int focusPos, int64_t frameDurNs) {
     camera_metadata_t* metadata = allocate_camera_metadata(30, 1024);
     if (!metadata) return nullptr;
 
@@ -1206,12 +1212,11 @@ static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t ti
     int32_t cropRegion[] = {0, 0, 3280, 2464};
     add_camera_metadata_entry(metadata, ANDROID_SCALER_CROP_REGION, cropRegion, 4);
 
-    /* ANDROID_SENSOR_EXPOSURE_TIME (ns) */
-    int64_t expTimeNs = (int64_t)exposureVal * 1000LL;
-    add_camera_metadata_entry(metadata, ANDROID_SENSOR_EXPOSURE_TIME, &expTimeNs, 1);
+    /* ANDROID_SENSOR_EXPOSURE_TIME (ns, from measured line period) */
+    add_camera_metadata_entry(metadata, ANDROID_SENSOR_EXPOSURE_TIME, &exposureNs, 1);
 
-    /* ANDROID_SENSOR_FRAME_DURATION (ns for 30fps) */
-    int64_t frameDuration = 33333333LL;
+    /* ANDROID_SENSOR_FRAME_DURATION (ns) */
+    int64_t frameDuration = frameDurNs > 0 ? frameDurNs : 39682540LL;
     add_camera_metadata_entry(metadata, ANDROID_SENSOR_FRAME_DURATION, &frameDuration, 1);
 
     /* ANDROID_SENSOR_SENSITIVITY */
@@ -1689,18 +1694,20 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
 
     camera_metadata_t* resultMetadata = nullptr;
     if (frameCaptured && !frameFlushed) {
-        int32_t exposure = 2400, sensitivity = 128;
+        int32_t sensitivity = 128;
+        int64_t exposureNs = 39682540LL, frameDurNs = 0;
         int afState = 0;
         int focusPos = 0;
         if (dev->pipeline) {
             mocha::CameraPipeline* p = static_cast<mocha::CameraPipeline*>(dev->pipeline);
-            exposure = p->getExposure();
             sensitivity = p->getGain();
             afState = p->getAfState();
             focusPos = p->getFocusPosition();
+            exposureNs = p->getExposureNs();
+            frameDurNs = p->getFramePeriodNs();
         }
         int64_t timestamp = ((int64_t)ts_end.tv_sec * 1000000000LL) + (ts_end.tv_nsec);
-        resultMetadata = build_result_metadata(frameNum, timestamp, exposure, sensitivity, afState, focusPos);
+        resultMetadata = build_result_metadata(frameNum, timestamp, exposureNs, sensitivity, afState, focusPos, frameDurNs);
     }
 
     camera3_capture_result_t result;
