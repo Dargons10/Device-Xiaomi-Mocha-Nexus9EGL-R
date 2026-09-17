@@ -27,6 +27,7 @@
 #include <dirent.h>
 #include <thread>
 #include <atomic>
+#include <mutex>
 #include <unistd.h>
 
 #include "MochaCameraHAL.h"
@@ -244,6 +245,14 @@ struct mocha_camera_device_t {
 
     const camera3_stream_t* blob_stream;
     volatile bool closing;
+
+    /* Serializes access to dev->pipeline across the HwBinder worker threads.
+       The framework can have a process_capture_request running on one binder
+       thread while close()/flush()/configure_streams() run on another. Without
+       this, close() deletes the pipeline out from under an in-flight capture
+       (use-after-free) which crashes the provider and wedges the caller's
+       closeCamera() binder transaction (the front<->back switch hang). */
+    std::mutex* pipelineLock;
 };
 
 // Initialize static camera characteristics
@@ -764,6 +773,7 @@ static int camera_device_init(const hw_module_t *module, hw_device_t **device) {
     dev->af_trigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     dev->af_trigger_handled = false;
     dev->blob_stream = nullptr;
+    dev->pipelineLock = new std::mutex();
 
     *device = &dev->common;
     
@@ -780,6 +790,10 @@ static int camera_device_close(hw_device_t *device) {
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
     dev->closing = true;
+
+    /* Wait for any in-flight process_capture_request to finish before
+       tearing the pipeline down (use-after-free / provider-death source). */
+    std::unique_lock<std::mutex> pl(*dev->pipelineLock);
 
     if (dev->jpeg_encoder) {
         delete dev->jpeg_encoder;
@@ -804,6 +818,8 @@ static int camera_device_close(hw_device_t *device) {
         dev->pipeline = nullptr;
     }
 
+    pl.unlock();
+    delete dev->pipelineLock;
     delete dev;
     
     ALOGI("Camera device closed");
@@ -841,6 +857,8 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
     }
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
+
+    std::lock_guard<std::mutex> cfgLock(*dev->pipelineLock);
 
     // Find pipeline stream (prefer RGBA_8888, then IMPLEMENTATION_DEFINED, then any non-BLOB)
     camera3_stream_t* pipelineStream = nullptr;
@@ -1350,6 +1368,11 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
 
+    /* Serialize with close()/flush()/configure_streams() pipeline teardown
+       and with sibling capture threads (the V4L2 fd + demosaic/AE state are
+       single-instance). */
+    std::lock_guard<std::mutex> capLock(*dev->pipelineLock);
+
     if (dev->closing) {
         return -ENOSYS;
     }
@@ -1754,7 +1777,11 @@ static int camera_device_flush(const camera3_device_t *device) {
     }
 
     mocha_camera_device_t *dev = (mocha_camera_device_t *)device;
-    
+
+    /* Runs after the currently-held capture finishes (max ~1.8 s poll
+       budget, well inside the framework's drain timeout). */
+    std::lock_guard<std::mutex> flLock(*dev->pipelineLock);
+
     // Stop V4L2 streaming IMMEDIATELY to interrupt any threads blocked
     // in captureFrame() (poll/DQBUF). Without this, those threads stay
     // blocked for 1800ms per retry, causing the framework's drain to
