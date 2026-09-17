@@ -111,6 +111,9 @@ CameraPipeline::CameraPipeline()
     mExposureStepLines(0),
     mMainHalfNs(10000000),
     mVtsLines(2510),
+    mExpMin(10),
+    mExpMax(2500),
+    mExpUnitsPerLine(1),
     mLinePeriodNs(0),
     mFramePeriodNs(0),
     mPrevFrameTsNs(0),
@@ -280,7 +283,9 @@ int CameraPipeline::getGain() {
 
 int64_t CameraPipeline::getExposureNs() const {
     int64_t lineNs = mLinePeriodNs > 0 ? mLinePeriodNs : 15780; /* ~25.2fps@VTS2510 */
-    return (int64_t)mCurrentExposure * lineNs;
+    int64_t lines = mCurrentExposure / mExpUnitsPerLine;
+    if (lines < 1) lines = 1;
+    return lines * lineNs;
 }
 
 int CameraPipeline::configure(const PipelineConfig& config) {
@@ -295,7 +300,22 @@ int CameraPipeline::configure(const PipelineConfig& config) {
        front OV5693 1280x720 = its own total). The mains half-period is
        10 ms @ 50 Hz (Spain/EU) or 8.333 ms @ 60 Hz (US). Override with
        persist.vendor.camera.antibanding = auto|50|60|off (default auto-50). */
-    mVtsLines = 2510;  /* IMX179 frame length regs 0x0340/0x0341 = 0x09CE */
+    /* Exposure control semantics differ per sensor:
+       IMX179 kernel control is [1,2500] in whole integration lines
+       (regs 0x0202/0x0203; frame length 0x0340/1 = 0x09CE = 2510).
+       OV5693 writes the raw 24-bit AEC value (regs 0x3500-0x3502),
+       16 units per line, VTS 992, so full-frame exposure is ~15800. */
+    if (mCameraId == 0) {
+        mVtsLines = 2510;
+        mExpUnitsPerLine = 1;
+        mExpMin = 10;
+        mExpMax = 2500;
+    } else {
+        mVtsLines = 992;
+        mExpUnitsPerLine = 16;
+        mExpMin = 160;
+        mExpMax = 15800;
+    }
     mTimingFrozen = false;
     mDeltaCount = 0;
     mPrevFrameTsNs = 0;
@@ -481,6 +501,8 @@ int CameraPipeline::startStreaming() {
     if (ioctl(mFd, VIDIOC_STREAMON, &type) < 0) return -errno;
 
     if (mCameraId == 0) {
+        mCurrentExposure = 800;
+        mCurrentGain = 60;
         setExposure(mCurrentExposure);
         setGain(mCurrentGain);
         ALOGI("Initial exposure=%d gain=%d", mCurrentExposure, mCurrentGain);
@@ -489,6 +511,11 @@ int CameraPipeline::startStreaming() {
            Wait for kernel to power on sensor (s_power in capture thread). */
         usleep(300000); /* 300ms - wait for sensor power-on */
         ov5693_init_via_i2c(mSensorFd);
+        /* Seed AE state from the table defaults (regs 0x3500-0x3502 =
+           0x002E80 = 11904 raw; 0x350b = 0x40 = 64 gain units = 4x) so the
+           loop starts near the sensor's real exposure instead of 800. */
+        mCurrentExposure = 11904;
+        mCurrentGain = 64;
     }
 
     mStreaming = true;
@@ -550,8 +577,9 @@ void CameraPipeline::doAutoExposure(const uint8_t* rgbBuffer) {
     /* Kernel IMX179 control range is [1, 2500] lines; values beyond that
        used to be silently rejected (ERANGE) and the AE stuck at the last
        accepted value. */
-    const int expMin = 10, expMax = 2500;
-    const int gainMin = 1, gainMax = 240;
+    const int expMin = mExpMin, expMax = mExpMax;
+    const int gainMin = (mCameraId == 0) ? 1 : 16;   /* OV5693 0x350b: 16 = 1x */
+    const int gainMax = 240;
 
     long newEff = (long)(mCurrentExposure * (float)mCurrentGain * ratio);
     int newExp = (int)(newEff / mCurrentGain + 0.5f);

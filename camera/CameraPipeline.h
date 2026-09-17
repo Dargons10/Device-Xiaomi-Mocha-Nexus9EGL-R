@@ -119,6 +119,9 @@ private:
     int mExposureStepLines;    // #lines per mains half-cycle (0 = disabled)
     int64_t mMainHalfNs;       // mains half-period target (10 ms / 8.333 ms)
     int mVtsLines;             // vertical total size of active sensor mode
+    int mExpMin;               // V4L2_CID_EXPOSURE control range, raw units
+    int mExpMax;
+    int mExpUnitsPerLine;      // IMX179: 1 unit/line; OV5693: 16 units/line
     int64_t mLinePeriodNs;     // ns per sensor line (measured from frame timestamps)
     int64_t mFramePeriodNs;    // measured full-frame period (median, frozen)
     int64_t mPrevFrameTsNs;    // previous frame timestamp for delta
