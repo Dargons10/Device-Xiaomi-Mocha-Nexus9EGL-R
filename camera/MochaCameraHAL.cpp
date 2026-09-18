@@ -242,6 +242,7 @@ struct mocha_camera_device_t {
     uint8_t af_mode;
     uint8_t af_trigger;
     bool af_trigger_handled;
+    bool af_auto_scanned;
 
     const camera3_stream_t* blob_stream;
     volatile bool closing;
@@ -769,9 +770,10 @@ static int camera_device_init(const hw_module_t *module, hw_device_t **device) {
     dev->jpeg_encoder = nullptr;
     dev->temp_rgba = nullptr;
     dev->temp_rgba_size = 0;
-    dev->af_mode = ANDROID_CONTROL_AF_MODE_AUTO;
+    dev->af_mode = ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE;
     dev->af_trigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     dev->af_trigger_handled = false;
+    dev->af_auto_scanned = false;
     dev->blob_stream = nullptr;
     dev->pipelineLock = new std::mutex();
 
@@ -1033,6 +1035,10 @@ static int camera_device_configure_streams(const camera3_device_t *device, camer
     dev->last_config_width = pipelineStream->width;
     dev->last_config_height = pipelineStream->height;
 
+    dev->af_trigger_handled = false;
+    dev->af_auto_scanned = false;
+    dev->af_trigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
+
     dev->streams_configured = true;
     ALOGI("Streams configured successfully: pipeline=%dx%d preview=%dx%d BLOB=%s", 
           dev->pipeline_width, dev->pipeline_height,
@@ -1163,7 +1169,7 @@ static const camera_metadata_t* camera_device_construct_default_request_settings
     return metadata;
 }
 
-static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t timestamp, int64_t exposureNs, int32_t sensitivity, int afState, int focusPos, int64_t frameDurNs) {
+static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t timestamp, int64_t exposureNs, int32_t sensitivity, int afState, int focusPos, int64_t frameDurNs, uint8_t afMode) {
     camera_metadata_t* metadata = allocate_camera_metadata(30, 1024);
     if (!metadata) return nullptr;
 
@@ -1204,22 +1210,31 @@ static camera_metadata_t* build_result_metadata(uint32_t frameNumber, int64_t ti
     switch (afState) {
         case 0:  lensState = ANDROID_LENS_STATE_STATIONARY; break;
         case 1:  lensState = ANDROID_LENS_STATE_MOVING; break;
-        case 4:  lensState = ANDROID_LENS_STATE_STATIONARY; break;
+        case 2:  lensState = ANDROID_LENS_STATE_STATIONARY; break;
         default: lensState = ANDROID_LENS_STATE_STATIONARY; break;
     }
     add_camera_metadata_entry(metadata, ANDROID_LENS_STATE, &lensState, 1);
 
     /* ANDROID_CONTROL_AF_MODE */
-    uint8_t resultAfMode = ANDROID_CONTROL_AF_MODE_AUTO;
+    uint8_t resultAfMode = afMode;
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AF_MODE, &resultAfMode, 1);
 
     /* ANDROID_CONTROL_AF_TRIGGER */
     uint8_t resultAfTrigger = ANDROID_CONTROL_AF_TRIGGER_IDLE;
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AF_TRIGGER, &resultAfTrigger, 1);
 
-    /* ANDROID_CONTROL_AF_STATE - Report INACTIVE so AFTriggerResult completes
-       and ConvergedImageCaptureCommand can proceed to captureBurst(). */
-    uint8_t resultAfState = ANDROID_CONTROL_AF_STATE_INACTIVE;
+    /* ANDROID_CONTROL_AF_STATE: pipeline 0=inactive 1=scanning 2=locked 3=failed */
+    uint8_t resultAfState;
+    bool continuous = (afMode == ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+    switch (afState) {
+        case 1:  resultAfState = continuous ? ANDROID_CONTROL_AF_STATE_PASSIVE_SCAN
+                                            : ANDROID_CONTROL_AF_STATE_ACTIVE_SCAN; break;
+        case 2:  resultAfState = continuous ? ANDROID_CONTROL_AF_STATE_PASSIVE_FOCUSED
+                                            : ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED; break;
+        case 3:  resultAfState = continuous ? ANDROID_CONTROL_AF_STATE_PASSIVE_UNFOCUSED
+                                            : ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED; break;
+        default: resultAfState = ANDROID_CONTROL_AF_STATE_INACTIVE; break;
+    }
     add_camera_metadata_entry(metadata, ANDROID_CONTROL_AF_STATE, &resultAfState, 1);
 
     /* ANDROID_REQUEST_ID */
@@ -1423,12 +1438,22 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
             dev->af_mode == ANDROID_CONTROL_AF_MODE_CONTINUOUS_PICTURE) {
             if (dev->af_trigger == ANDROID_CONTROL_AF_TRIGGER_START && !dev->af_trigger_handled) {
                 ALOGI("AF TRIGGER START received");
+                dev->af_auto_scanned = true;
                 p->startAfScan();
                 dev->af_trigger_handled = true;
             } else if (dev->af_trigger == ANDROID_CONTROL_AF_TRIGGER_CANCEL) {
                 ALOGI("AF TRIGGER CANCEL received");
                 p->cancelAf();
                 dev->af_trigger_handled = false;
+                dev->af_auto_scanned = false;
+            } else if (!dev->af_auto_scanned) {
+                /* Basic camera apps (AOSP Camera2) send settings on the first
+                   request only and never fire AF_TRIGGER: run one passive
+                   scan at session start so initial framing is sharp. */
+                ALOGI("AF: mode=%d with no AF_TRIGGER from app, running initial passive scan",
+                      dev->af_mode);
+                dev->af_auto_scanned = true;
+                p->startAfScan();
             }
         }
     }
@@ -1730,7 +1755,7 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
             frameDurNs = p->getFramePeriodNs();
         }
         int64_t timestamp = ((int64_t)ts_end.tv_sec * 1000000000LL) + (ts_end.tv_nsec);
-        resultMetadata = build_result_metadata(frameNum, timestamp, exposureNs, sensitivity, afState, focusPos, frameDurNs);
+        resultMetadata = build_result_metadata(frameNum, timestamp, exposureNs, sensitivity, afState, focusPos, frameDurNs, dev->af_mode);
     }
 
     camera3_capture_result_t result;

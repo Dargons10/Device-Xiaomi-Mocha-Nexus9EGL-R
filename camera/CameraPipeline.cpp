@@ -1048,6 +1048,38 @@ int CameraPipeline::sobelEnergyNw(const uint8_t* rgb, int w, int h) const {
 }
 
 /*
+ * AF sharpness metric: sum of |dG/dx| + |dG/dy| on the green channel of
+ * LINEAR demosaiced RGB, over a central 60% ROI, sampled every 2 px.
+ * Saturating (>=250) and black (<=6) pixels are discarded: a flat,
+ * saturated field must NOT look like a sharp peak. Returns 0 when the
+ * measurement is untrustworthy (too few usable pixels).
+ */
+int CameraPipeline::afSharpness(const uint8_t* rgb, int w, int h) const {
+    if (!rgb || w < 64 || h < 64) return 0;
+    const int stride = w * 3;
+    const int x0 = w / 5, x1 = w - w / 5;
+    const int y0 = h / 5, y1 = h - h / 5;
+    long long total = 0;
+    int valid = 0, clipped = 0;
+    for (int y = y0 + 1; y < y1 - 1; y += 2) {
+        const uint8_t* row = rgb + (size_t)y * stride;
+        const uint8_t* up = row - stride;
+        const uint8_t* dn = row + stride;
+        for (int x = x0 + 1; x < x1 - 1; x += 2) {
+            const int i = x * 3 + 1;
+            const int c = row[i];
+            if (c >= 250 || c <= 6) { clipped++; continue; }
+            total += abs((int)row[i + 3] - (int)row[i - 3]) +
+                     abs((int)dn[i] - (int)up[i]);
+            valid++;
+        }
+    }
+    if (valid < 2000) return 0;
+    (void)clipped;
+    return (int)(total > 0x7fffffffLL ? 0x7fffffffLL : total);
+}
+
+/*
  * Capture one V4L2 frame and return Sobel energy from the green channel.
  * Used during AF sweep — captures a frame, demosaics to RGB, measures contrast.
  */
@@ -1066,7 +1098,7 @@ int CameraPipeline::captureForAf() {
     struct v4l2_buffer buf;
     memset(&buf, 0, sizeof(buf));
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    buf.memory = V4L2_MEMORY_USERPTR;
+    buf.memory = V4L2_MEMORY_MMAP;
 
     int ret = ioctl(mFd, VIDIOC_DQBUF, &buf);
     if (ret < 0) return -errno;
@@ -1075,38 +1107,16 @@ int CameraPipeline::captureForAf() {
     uint8_t* frameBuffer = (uint8_t*)mBuffers[buf.index].start;
     int energy = 0;
 
-    if (mConfig.enableISP && mDemosaic && mColorConv) {
-        /* Demosaic to mRgbBuffer */
+    if (mConfig.enableISP && mDemosaic) {
+        /* AF metric on LINEAR demosaiced RGB: no AWB gains, no gamma, and AE
+           is frozen for the whole scan (no doAutoExposure here) so every
+           position is measured under identical conditions. Clipped/blacked
+           pixels are rejected by afSharpness. */
         mDemosaic->process(frameBuffer, mRgbBuffer);
-        /* Apply AE — doAutoExposure reads green from mRgbBuffer */
-        if (mConfig.enableAE)
-            doAutoExposure(mRgbBuffer);
-        /* Apply AWB gains in-place */
-        if (mConfig.enableAWB) {
-            doAutoWhiteBalance(mRgbBuffer);
-        }
-        float rG = mConfig.enableAWB ? mAwbGains[0] : mConfig.wbGain[0];
-        float gG = mConfig.enableAWB ? mAwbGains[1] : mConfig.wbGain[1];
-        float bG = mConfig.enableAWB ? mAwbGains[2] : mConfig.wbGain[2];
-        int total = mConfig.width * mConfig.height;
-        for (int i = 0; i < total; i++) {
-            int off = i * 3;
-            int r = (int)(mRgbBuffer[off]   * rG);
-            int g = (int)(mRgbBuffer[off+1] * gG);
-            int b = (int)(mRgbBuffer[off+2] * bG);
-            mRgbBuffer[off]   = r > 255 ? 255 : (uint8_t)r;
-            mRgbBuffer[off+1] = g > 255 ? 255 : (uint8_t)g;
-            mRgbBuffer[off+2] = b > 255 ? 255 : (uint8_t)b;
-        }
-        applyGamma(mRgbBuffer, mConfig.width, mConfig.height, mConfig.gamma);
-
-        /* Measure Sobel energy on the green channel */
-        energy = sobelEnergyNw(mRgbBuffer, mConfig.width, mConfig.height);
+        energy = afSharpness(mRgbBuffer, mConfig.width, mConfig.height);
     }
 
-    /* Return buffer to queue */
-    buf.m.userptr = (unsigned long)mBuffers[buf.index].start;
-    buf.length = mBuffers[buf.index].length;
+    /* Return buffer to queue (MMAP: requeue by index) */
     if (ioctl(mFd, VIDIOC_QBUF, &buf) < 0) return -errno;
 
     return energy;
@@ -1124,19 +1134,30 @@ void CameraPipeline::startAfScan() {
 
     int bestEnergy = 0;
     int bestPos = 400;
+    /* AD5823 code mapping: ~140 = hyperfocal/infinity, ~640 = macro
+       (working range per the mocha focuser config; beyond the ends the
+       VCM sits against mechanical stops). Sweep full working range. */
+    const int sweepMin = 140;
+    const int sweepMax = 640;
     const int coarseStep = 50;
     const int fineStep = 10;
     const int settleMs = 60;
 
-    /* ---- Coarse sweep: 140 → 640 ---- */
-    for (int pos = 140; pos <= 640; pos += coarseStep) {
+    /* ---- Coarse sweep: sweepMin → sweepMax ---- */
+    int fails = 0;
+    for (int pos = sweepMin; pos <= sweepMax; pos += coarseStep) {
         setFocus(pos);
         usleep(settleMs * 1000);
         int energy = captureForAf();
-        if (energy < 0) {
+        if (energy <= 0) { // ioctl error OR untrusted (clipped) metric
             ALOGW("AF: capture error at pos %d: %d", pos, energy);
+            if (++fails >= 4) {
+                ALOGE("AF: capture stalled, aborting scan");
+                break;
+            }
             continue;
         }
+        fails = 0;
         ALOGI("AF: coarse pos=%d energy=%d", pos, energy);
         if (energy > bestEnergy) {
             bestEnergy = energy;
@@ -1146,16 +1167,23 @@ void CameraPipeline::startAfScan() {
 
     /* ---- Fine sweep around best ---- */
     int fineStart = bestPos - coarseStep;
-    if (fineStart < 140) fineStart = 140;
+    if (fineStart < sweepMin) fineStart = sweepMin;
     int fineEnd = bestPos + coarseStep;
-    if (fineEnd > 640) fineEnd = 640;
+    if (fineEnd > sweepMax) fineEnd = sweepMax;
 
     for (int pos = fineStart; pos <= fineEnd; pos += fineStep) {
         if (pos == bestPos) continue; // already measured
         setFocus(pos);
         usleep(settleMs * 1000);
         int energy = captureForAf();
-        if (energy < 0) continue;
+        if (energy <= 0) { // ioctl error OR untrusted (clipped) metric
+            if (++fails >= 4) {
+                ALOGE("AF: capture stalled, aborting fine sweep");
+                break;
+            }
+            continue;
+        }
+        fails = 0;
         ALOGI("AF: fine pos=%d energy=%d", pos, energy);
         if (energy > bestEnergy) {
             bestEnergy = energy;
@@ -1164,16 +1192,20 @@ void CameraPipeline::startAfScan() {
     }
 
     /* ---- Lock to best position ---- */
-    setFocus(bestPos);
-    usleep(settleMs * 1000);
-    mAfState = 4; // FOCUSED_LOCKED
-    ALOGI("AF: scan complete, lock at position=%d energy=%d", bestPos, bestEnergy);
+    if (bestEnergy > 0) {
+        setFocus(bestPos);
+        usleep(settleMs * 1000);
+        mAfState = 2; // LOCKED
+        ALOGI("AF: scan complete, lock at position=%d energy=%d", bestPos, bestEnergy);
+    } else {
+        mAfState = 3; // SCAN FAILED (no usable frames)
+        ALOGE("AF: scan failed, no energy measurements");
+    }
 }
 
 void CameraPipeline::cancelAf() {
-    setFocus(0);
-    mAfState = 0; // INACTIVE
-    ALOGI("AF: cancelled, focus at infinity");
+    mAfState = 0; // INACTIVE - keep current focus position
+    ALOGI("AF: cancelled, focus held at position=%d", mFocusPosition);
 }
 
 } // namespace mocha
