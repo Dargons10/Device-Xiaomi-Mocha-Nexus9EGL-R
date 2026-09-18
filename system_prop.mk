@@ -110,6 +110,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.sys.sdcardfs=true
 
+# MediaProvider FUSE passthrough deadlocks /storage/emulated (ENOTCONN until
+# reboot) whenever the provider restarts (storage_session_controller reset,
+# user lifecycle) - the 3.10 sdcardfs path is the stable one on this device.
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.sys.fuse=0
+
 # Wifi
 PRODUCT_PROPERTY_OVERRIDES += \
     persist.debug.wfd.enable=1 \
