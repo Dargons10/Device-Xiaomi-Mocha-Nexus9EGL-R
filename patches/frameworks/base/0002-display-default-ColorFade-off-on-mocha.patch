@@ -1,0 +1,44 @@
+From a0631294ef3529dc4bcc01433a5be9622634ad53 Mon Sep 17 00:00:00 2001
+From: Dargons10 <jdamr2p@gmail.com>
+Date: Fri, 18 Sep 2026 08:47:58 +0200
+Subject: [PATCH] display: default ColorFade off on mocha (watchdog killer on
+ Tegra) At screen-off, ColorFade.draw -> eglMakeCurrent -> libnvwsi
+ dequeueBuffer blocks on a SurfaceFlinger binder transaction that never
+ returns (worst when I/O is saturated, e.g. first SD media scan); the
+ PowerManagerService handler misses its watchdog ping and system_server is
+ soft-rebooted every ~3 minutes - the real identity of "storage stops working
+ when the SD goes in".
+
+ColorFade only ships disabled on low-ram builds; this device is not
+one. Gate it on persist.sys.display.color_fade (default 0) - only
+loses the fade animation around the hard on/off cut.
+
+Co-authored-by: Qwen3.8-27B-local
+Change-Id: I0caa107c2313498adebd7bd39ac53c52e7b88aeb
+Signed-off-by: Opencode <opencode.ai>
+---
+ .../android/server/display/DisplayPowerController.java    | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/display/DisplayPowerController.java b/services/core/java/com/android/server/display/DisplayPowerController.java
+index f77f0e302aa..d684adbc851 100644
+--- a/services/core/java/com/android/server/display/DisplayPowerController.java
++++ b/services/core/java/com/android/server/display/DisplayPowerController.java
+@@ -533,7 +533,13 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
+             }
+         }
+ 
+-        mColorFadeEnabled = !ActivityManager.isLowRamDeviceStatic();
++        /* Tegra124 (mocha): the ColorFade surface stalls on the EGL blob at
++           screen-off (dequeueBuffer to SurfaceFlinger never returns while
++           e.g. a media scan saturates I/O), wedging the PowerManagerService
++           handler until the watchdog soft-reboots system_server. Default it
++           off here; opt back in with persist.sys.display.color_fade=1. */
++        mColorFadeEnabled = SystemProperties.getInt("persist.sys.display.color_fade", 0) != 0
++                && !ActivityManager.isLowRamDeviceStatic();
+         mColorFadeFadesConfig = resources.getBoolean(
+                 com.android.internal.R.bool.config_animateScreenLights);
+ 
+-- 
+2.47.3
+
