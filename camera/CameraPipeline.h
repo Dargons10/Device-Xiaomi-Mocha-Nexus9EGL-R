@@ -74,6 +74,7 @@ public:
     int setFocus(int position);
     int getFocusPosition() const { return mFocusPosition; }
     int getAfState() const { return mAfState; }
+    int64_t afAgeMs() const;   // ms since last AF scan attempt (huge if never)
     void startAfScan();
     void cancelAf();
 
@@ -137,6 +138,7 @@ private:
 
     int mFocusPosition;
     int mAfState;
+    int64_t mAfLastScanNs;
 };
 
 } // namespace mocha

@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <system/graphics.h>
 #include <cutils/log.h>
 #include <cutils/properties.h>
@@ -123,7 +124,8 @@ CameraPipeline::CameraPipeline()
       mHasAwbInit(false),
       mLastGamma(0.0f),
       mFocusPosition(0),
-      mAfState(0) {
+      mAfState(0),
+      mAfLastScanNs(0) {
     for (int i = 0; i < 4; i++) {
         mBuffers[i].start = nullptr;
         mBuffers[i].length = 0;
@@ -1144,6 +1146,8 @@ void CameraPipeline::startAfScan() {
     const int settleMs = 60;
 
     /* ---- Coarse sweep: sweepMin → sweepMax ---- */
+    int energies[40];
+    int nEng = 0;
     int fails = 0;
     for (int pos = sweepMin; pos <= sweepMax; pos += coarseStep) {
         setFocus(pos);
@@ -1158,6 +1162,7 @@ void CameraPipeline::startAfScan() {
             continue;
         }
         fails = 0;
+        if (nEng < 40) energies[nEng++] = energy;
         ALOGI("AF: coarse pos=%d energy=%d", pos, energy);
         if (energy > bestEnergy) {
             bestEnergy = energy;
@@ -1184,6 +1189,7 @@ void CameraPipeline::startAfScan() {
             continue;
         }
         fails = 0;
+        if (nEng < 40) energies[nEng++] = energy;
         ALOGI("AF: fine pos=%d energy=%d", pos, energy);
         if (energy > bestEnergy) {
             bestEnergy = energy;
@@ -1192,11 +1198,40 @@ void CameraPipeline::startAfScan() {
     }
 
     /* ---- Lock to best position ---- */
-    if (bestEnergy > 0) {
+    struct timespec tsNow;
+    clock_gettime(CLOCK_MONOTONIC, &tsNow);
+    mAfLastScanNs = (int64_t)tsNow.tv_sec * 1000000000LL + tsNow.tv_nsec;
+
+    if (bestEnergy > 0 && nEng >= 5) {
+        /* Peak must dominate the curve: a flat (low-texture) scene yields a
+           "best" that is noise, and chasing it unseats a good previous lock.
+           Require best >= 1.3x the median of all measurements. */
+        int sorted[40];
+        memcpy(sorted, energies, nEng * sizeof(int));
+        for (int i = 1; i < nEng; i++) {
+            int v = sorted[i], j = i - 1;
+            while (j >= 0 && sorted[j] > v) { sorted[j + 1] = sorted[j]; j--; }
+            sorted[j + 1] = v;
+        }
+        int median = sorted[nEng / 2];
+        if (bestEnergy >= median + median / 3) {
+            setFocus(bestPos);
+            usleep(settleMs * 1000);
+            mAfState = 2; // LOCKED
+            ALOGI("AF: scan complete, lock at position=%d energy=%d median=%d",
+                  bestPos, bestEnergy, median);
+        } else {
+            /* Inconclusive: leave the lens exactly where it was. */
+            if (mAfState != 2) mAfState = 3; // never had a valid lock
+            ALOGW("AF: inconclusive (flat contrast best=%d median=%d), keeping position=%d",
+                  bestEnergy, median, mFocusPosition);
+        }
+    } else if (bestEnergy > 0) {
         setFocus(bestPos);
         usleep(settleMs * 1000);
-        mAfState = 2; // LOCKED
-        ALOGI("AF: scan complete, lock at position=%d energy=%d", bestPos, bestEnergy);
+        mAfState = 2;
+        ALOGI("AF: scan complete (few samples), lock at position=%d energy=%d",
+              bestPos, bestEnergy);
     } else {
         mAfState = 3; // SCAN FAILED (no usable frames)
         ALOGE("AF: scan failed, no energy measurements");
@@ -1206,6 +1241,15 @@ void CameraPipeline::startAfScan() {
 void CameraPipeline::cancelAf() {
     mAfState = 0; // INACTIVE - keep current focus position
     ALOGI("AF: cancelled, focus held at position=%d", mFocusPosition);
+}
+
+int64_t CameraPipeline::afAgeMs() const {
+    if (mAfLastScanNs == 0) return 0x7fffffffffffffffLL;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    int64_t now = (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+    int64_t age = (now - mAfLastScanNs) / 1000000;
+    return age > 0 ? age : 0;
 }
 
 } // namespace mocha

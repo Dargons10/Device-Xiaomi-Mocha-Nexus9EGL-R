@@ -1455,6 +1455,22 @@ static int camera_device_process_capture_request(const camera3_device_t *device,
                 dev->af_auto_scanned = true;
                 p->startAfScan();
             }
+            /* Pre-shutter autofocus: a still-capture request with a stale
+               lock means the user recomposed since the last scan. Rescan
+               now (legacy-AF style: preview stalls ~2s) so the photo is
+               focused on the subject actually aimed at. */
+            if (request->num_output_buffers > 0) {
+                bool wantsBlob = false;
+                for (uint32_t i = 0; i < request->num_output_buffers; i++) {
+                    const camera3_stream_t* s = request->output_buffers[i].stream;
+                    if (s && s->format == HAL_PIXEL_FORMAT_BLOB) wantsBlob = true;
+                }
+                if (wantsBlob && p->afAgeMs() > 3000) {
+                    ALOGI("AF: shutter with stale lock (%lld ms) - rescanning before capture",
+                          (long long)p->afAgeMs());
+                    p->startAfScan();
+                }
+            }
         }
     }
 
