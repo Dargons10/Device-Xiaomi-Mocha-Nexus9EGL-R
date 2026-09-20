@@ -48,7 +48,7 @@ on boot
     setprop nvwfd.gamemode 1
 
 on init
-     setprop ro.feature.stylus 1
+    setprop ro.feature.stylus 1
     setprop persist.tegra.cursor.enable 1
     setprop sf.async.cursor.enable 1
     setprop input.tch_blk.enabled 1
@@ -75,16 +75,23 @@ on init
     write /d/tegra_actmon/cpu_emc/avg_act_threshold 50000
 
 service charger /system/bin/charger
-    class charger
-    user root
-    group log root radio system graphics input
-    capabilities SYS_BOOT
-    seclabel u:r:charger:s0
+class charger
+critical
+user system
+group system graphics input
+capabilities SYS_BOOT
+seclabel u:r:charger:s0
+
+service charger_led /system/bin/sh /system/bin/charger_led.sh
+class charger
+user root
+group root
+oneshot
 
 on charger
-    setprop sys.usb.config mtp
-    mount ext4 /dev/block/platform/sdhci-tegra.3/by-name/APP /system wait ro
-    write /sys/devices/system/cpu/cpuquiet/tegra_cpuquiet/enable 0
-    write /sys/devices/system/cpu/cpuquiet/tegra_cpuquiet/no_lp -1
-    write /sys/devices/system/cpu/cpu2/online 0
-    write /sys/devices/system/cpu/cpu3/online 0
+
+write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor powersave
+write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 300000
+write /sys/devices/system/cpu/cpu1/online 0
+write /sys/devices/system/cpu/cpu2/online 0
+write /sys/devices/system/cpu/cpu3/online 0

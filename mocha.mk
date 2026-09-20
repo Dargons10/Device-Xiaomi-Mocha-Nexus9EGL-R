@@ -82,6 +82,15 @@ PRODUCT_PACKAGES += \
     camera.tegra \
     libshim_camera
 
+# ChargerTile
+PRODUCT_PACKAGES += \
+    charger \
+    charger_res_images
+
+# LED de carga
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/initfiles/charger_led.sh:system/bin/charger_led.sh
+
 # Comm Permissions
 PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/handheld_core_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/handheld_core_hardware.xml \
@@ -93,6 +102,7 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     android.hardware.configstore@1.1-impl \
     android.hardware.configstore@1.1-service
+
 # Dexpreopt
 PRODUCT_DEXPREOPT_SPEED_APPS += \
     SystemUI

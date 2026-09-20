@@ -140,11 +140,14 @@ MALLOC_SVELTE := true
 TARGET_HAS_MEMFD_BACKPORT := true
 
 # Offmode Charging
+HEALTHD_ENABLE_TRICOLOR_LED := true
+BOARD_CHARGER_ENABLE_SUSPEND := true
+BOARD_CHARGER_SHOW_PERCENTAGE := true
 BOARD_CHARGER_DISABLE_INIT_BLANK := true
-BACKLIGHT_PATH := "/sys/class/backlight/lcd-backlight/brightness"
-RED_LED_PATH := "/sys/class/leds/red/brightness"
-GREEN_LED_PATH := "/sys/class/leds/green/brightness"
-BLUE_LED_PATH := "/sys/class/leds/blue/brightness"
+BACKLIGHT_PATH := /sys/devices/platform/tegra12-i2c.0/i2c-0/0-002c/backlight/lcd-backlight/brightness
+RED_LED_PATH := /sys/class/leds/red/brightness
+GREEN_LED_PATH := /sys/class/leds/green/brightness
+BLUE_LED_PATH := /sys/class/leds/blue/brightness
 
 # Per-application sizes for shader cache
 MAX_EGL_CACHE_SIZE := 4194304
