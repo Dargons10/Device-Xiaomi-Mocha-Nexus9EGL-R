@@ -22,6 +22,12 @@ on early-init
     chmod 0755 /gl
     chown root system /gl
 
+
+    write /sys/bus/i2c/devices/i2c-2/clock_rate 100000
+    write /sys/bus/i2c/devices/i2c-2/retry_count 3
+    write /sys/bus/i2c/devices/i2c-2/timeout 500000
+
+
 on fs
     setprop ro.crypto.tmpfs_options size=128m,mode=0771,uid=1000,gid=1000
     setprop ro.crypto.umount_sd false

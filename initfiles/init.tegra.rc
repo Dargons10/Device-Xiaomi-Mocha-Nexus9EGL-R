@@ -169,7 +169,9 @@ on boot
 
 # LP5521
     chown system system /sys/bus/i2c/drivers/lp5521/0-0032/select_engine
+    chmod 0660 /sys/bus/i2c/drivers/lp5521/0-0032/select_engine
     chown system system /sys/bus/i2c/drivers/lp5521/0-0032/run_engine
+    chmod 0660 /sys/bus/i2c/drivers/lp5521/0-0032/run_engine
 
 # TLK storage service
 import /vendor/etc/init/hw/init.tlk.rc
