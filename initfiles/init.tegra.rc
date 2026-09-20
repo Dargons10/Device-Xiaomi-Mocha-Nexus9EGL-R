@@ -153,6 +153,8 @@ on boot
 
 # Touch
     chown system system /sys/class/input/input0/enabled
+    chown system system /sys/class/input/input0/enable
+    chmod 0660 /sys/class/input/input0/enable
 
 # nvdps
     chown system system /sys/devices/platform/host1x/tegradc.0/nvdps
