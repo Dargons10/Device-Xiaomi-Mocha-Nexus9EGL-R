@@ -14,7 +14,16 @@ for dir in $dirs ; do
 	cd $rootdirectory
 	cd $dir
     echo -e "\n${RED}Applying ${NC}$dir ${RED}patches...${NC}\n"
-	git apply -v $rootdirectory/device/xiaomi/mocha/patches/$dir/*.patch
+	for p in $rootdirectory/device/xiaomi/mocha/patches/$dir/*.patch ; do
+		[ -e "$p" ] || continue
+		if git apply --check "$p" 2>/dev/null ; then
+			git apply -v "$p"
+		elif git apply --check -R "$p" 2>/dev/null ; then
+			echo "already applied: $(basename $p)"
+		else
+			echo -e "${RED}FAILED: ${NC}$p"
+		fi
+	done
 done
 
 # -----------------------------------
