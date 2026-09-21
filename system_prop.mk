@@ -51,7 +51,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.tegra.compositor=glcomposer \
     persist.tegra.decompression=disabled \
     ro.surface_flinger.use_frame_rate_api=false \
-    ro.hardware.vulkan=nvgpu \
     debug.sf.latch_unsignaled=0 \
     debug.sf.disable_backpressure=0 \
     ro.input.noresample=1 \
