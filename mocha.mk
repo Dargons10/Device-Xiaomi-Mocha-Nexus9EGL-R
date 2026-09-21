@@ -177,11 +177,11 @@ PRODUCT_PACKAGES += \
 
 # Gatekeeper
 PRODUCT_PACKAGES += \
-    android.hardware.gatekeeper@1.0-service.software
+    vendor.mocha.gatekeeper@1.0-service
 
 # Keymaster
 PRODUCT_PACKAGES += \
-    android.hardware.keymaster@4.1-service
+    vendor.mocha.keymaster@4.1-service
 
 # Light
 PRODUCT_PACKAGES += \
