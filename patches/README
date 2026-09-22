@@ -34,11 +34,14 @@ Patches:
   system/memory/lmkd/              workingset_refault counter wrap
   system/netd/                     NFLOG group removal
   system/connectivity/wificond/    BCM4350 ext-features log level
-  system/sepolicy/                 webview_zygote pgroup rules
-  system/bt/                      LDAC codec unavailable
-  device/xiaomi/mocha/             drop ro.hardware.vulkan=nvgpu
-  vendor/lineage/                 soong generated_kernel_headers stub
+   system/sepolicy/                 webview_zygote pgroup rules
+   system/bt/                      LDAC codec unavailable
+   vendor/lineage/                 soong generated_kernel_headers stub
 
 All patches above are committed in their respective repos (local
 commits on top of upstream); the .patch files here are the persistent
 record and the means to re-apply on a fresh tree.
+
+NOTE: changes to this repo itself (device/xiaomi/mocha, e.g.
+system_prop.mk) are normal commits, not patches, and are pushed to the
+device repo remote directly.
