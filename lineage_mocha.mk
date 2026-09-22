@@ -6,7 +6,7 @@ $(call inherit-product, vendor/lineage/config/common_full_tablet_wifionly.mk)
 
 PRODUCT_NAME := lineage_mocha
 PRODUCT_DEVICE := mocha
-PRODUCT_BAND := xiaomi
+PRODUCT_BAND := Xiaomi
 PRODUCT_MANUFACTURER := Xiaomi
 BOARD_VENDOR := Xiaomi
 
