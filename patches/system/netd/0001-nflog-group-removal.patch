@@ -1,0 +1,86 @@
+diff --git a/server/StrictController.cpp b/server/StrictController.cpp
+index 855bedbd..979bbb79 100644
+--- a/server/StrictController.cpp
++++ b/server/StrictController.cpp
+@@ -74,11 +74,11 @@ int StrictController::setupIptablesHooks(void) {
+ 
+     // Chain triggered when cleartext socket detected and penalty is log
+     CMD_V4V6("-A %s -j CONNMARK --or-mark %s", LOCAL_PENALTY_LOG, connmarkFlagAccept);
+-    CMD_V4V6("-A %s -j NFLOG --nflog-group 0", LOCAL_PENALTY_LOG);
++    CMD_V4V6("-A %s -j NFLOG", LOCAL_PENALTY_LOG);
+ 
+     // Chain triggered when cleartext socket detected and penalty is reject
+     CMD_V4V6("-A %s -j CONNMARK --or-mark %s", LOCAL_PENALTY_REJECT, connmarkFlagReject);
+-    CMD_V4V6("-A %s -j NFLOG --nflog-group 0", LOCAL_PENALTY_REJECT);
++    CMD_V4V6("-A %s -j NFLOG", LOCAL_PENALTY_REJECT);
+     CMD_V4V6("-A %s -j REJECT", LOCAL_PENALTY_REJECT);
+ 
+     // We use a high-order mark bit to keep track of connections that we've already resolved.
+diff --git a/server/StrictControllerTest.cpp b/server/StrictControllerTest.cpp
+index 3025d8cd..4f11d8f2 100644
+--- a/server/StrictControllerTest.cpp
++++ b/server/StrictControllerTest.cpp
+@@ -50,9 +50,9 @@ TEST_F(StrictControllerTest, TestSetupIptablesHooks) {
+     std::vector<std::string> v4 = {
+         "*filter",
+         "-A st_penalty_log -j CONNMARK --or-mark 0x1000000",
+-        "-A st_penalty_log -j NFLOG --nflog-group 0",
++        "-A st_penalty_log -j NFLOG",
+         "-A st_penalty_reject -j CONNMARK --or-mark 0x2000000",
+-        "-A st_penalty_reject -j NFLOG --nflog-group 0",
++        "-A st_penalty_reject -j NFLOG",
+         "-A st_penalty_reject -j REJECT",
+         "-A st_clear_detect -m connmark --mark 0x2000000/0x2000000 -j REJECT",
+         "-A st_clear_detect -m connmark --mark 0x1000000/0x1000000 -j RETURN",
+@@ -74,9 +74,9 @@ TEST_F(StrictControllerTest, TestSetupIptablesHooks) {
+     std::vector<std::string> v6 = {
+         "*filter",
+         "-A st_penalty_log -j CONNMARK --or-mark 0x1000000",
+-        "-A st_penalty_log -j NFLOG --nflog-group 0",
++        "-A st_penalty_log -j NFLOG",
+         "-A st_penalty_reject -j CONNMARK --or-mark 0x2000000",
+-        "-A st_penalty_reject -j NFLOG --nflog-group 0",
++        "-A st_penalty_reject -j NFLOG",
+         "-A st_penalty_reject -j REJECT",
+         "-A st_clear_detect -m connmark --mark 0x2000000/0x2000000 -j REJECT",
+         "-A st_clear_detect -m connmark --mark 0x1000000/0x1000000 -j RETURN",
+diff --git a/server/WakeupController.cpp b/server/WakeupController.cpp
+index eb36291c..63763681 100644
+--- a/server/WakeupController.cpp
++++ b/server/WakeupController.cpp
+@@ -208,11 +208,11 @@ Status WakeupController::execIptables(const std::string& action, const std::stri
+     // Max log message rate in packets/second
+     constexpr int kRateLimit = 10;
+     const char kFormat[] =
+-        "*mangle\n%s %s -i %s -j NFLOG --nflog-prefix %s --nflog-group %d --nflog-threshold %d"
++        "*mangle\n%s %s -i %s -j NFLOG --nflog-prefix %s --nflog-threshold %d"
+         " -m mark --mark 0x%08x/0x%08x -m limit --limit %d/s\nCOMMIT\n";
+     const auto cmd = StringPrintf(
+             kFormat, action.c_str(), WakeupController::LOCAL_MANGLE_INPUT, ifName.c_str(),
+-            prefix.c_str(), NetlinkManager::NFLOG_WAKEUP_GROUP, kBatch, mark, mask, kRateLimit);
++            prefix.c_str(), kBatch, mark, mask, kRateLimit);
+ 
+     std::string out;
+     auto rv = mIptables->execute(V4V6, cmd, &out);
+diff --git a/server/WakeupControllerTest.cpp b/server/WakeupControllerTest.cpp
+index ff99b987..84f0eb66 100644
+--- a/server/WakeupControllerTest.cpp
++++ b/server/WakeupControllerTest.cpp
+@@ -288,7 +288,7 @@ TEST_F(WakeupControllerTest, addInterface) {
+     const uint32_t kMask = 0x0F0F0F0F;
+     const char kExpected[] =
+         "*mangle\n-A wakeupctrl_mangle_INPUT -i test:prefix"
+-        " -j NFLOG --nflog-prefix wlan8 --nflog-group 3 --nflog-threshold 8"
++        " -j NFLOG --nflog-prefix wlan8 --nflog-threshold 8"
+         " -m mark --mark 0x12345678/0x0f0f0f0f -m limit --limit 10/s\nCOMMIT\n";
+     EXPECT_CALL(mIptables, execute(V4V6, kExpected, _)).WillOnce(Return(0));
+     EXPECT_OK(mController.addInterface(kPrefix, kIfName, kMark, kMask));
+@@ -301,7 +301,7 @@ TEST_F(WakeupControllerTest, delInterface) {
+     const uint32_t kMask = 0xF0F0F0F0;
+     const char kExpected[] =
+         "*mangle\n-D wakeupctrl_mangle_INPUT -i test:prefix"
+-        " -j NFLOG --nflog-prefix wlan8 --nflog-group 3 --nflog-threshold 8"
++        " -j NFLOG --nflog-prefix wlan8 --nflog-threshold 8"
+         " -m mark --mark 0x12345678/0xf0f0f0f0 -m limit --limit 10/s\nCOMMIT\n";
+     EXPECT_CALL(mIptables, execute(V4V6, kExpected, _)).WillOnce(Return(0));
+     EXPECT_OK(mController.delInterface(kPrefix, kIfName, kMark, kMask));

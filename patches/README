@@ -1,5 +1,44 @@
 This is patch directory
 
-cd WORKING_DIR
-sh device/xiaomi/mocha/patches/install.sh
-sh device/xiaomi/mocha/patches/uninstall.sh
+Layout: one subdirectory per repo (path relative to the tree root),
+numbered .patch files inside (git format, apply from the repo root).
+
+Usage:
+
+    cd WORKING_DIR
+    sh device/xiaomi/mocha/patches/install.sh     # apply all patches
+    sh device/xiaomi/mocha/patches/uninstall.sh   # revert all patches
+    sh device/xiaomi/mocha/patches/check.sh       # verify only (no apply)
+
+NOTE: uninstall.sh reverts via `git checkout -- . && git clean -df` in
+each listed repo (destructive: also removes untracked files, including
+this patches/ directory itself). Back it up before running.
+
+Patches:
+
+  bionic/libm/                     legacy vendor blob text relocations
+  frameworks/av/                   Tegra software decoder, camera/media,
+                                   stagefright tight, RGBA renderer
+  frameworks/av.disabled/          (disabled: C2 soft decoders YV12/stall)
+  frameworks/base/                 power Notifier NPE guard, ColorFade off
+  frameworks/native/               GraphicBuffer ctor/null-guard, SF+binder
+  hardware/interfaces/             Tegra camera session/provider/hwc2
+  system/core/                     init zygote32 ld-preload shim, add_root
+  system/extras/                   su from any uid
+  packages/apps/Camera2/           selfie preview NPE fallback (front cam
+                                   only advertises 4:3 previews), MediaStore
+                                   JPEG write (FUSE), picsize debug log
+  packages/apps/Gallery2/          video debug logging
+  hardware/nvidia/hwcomposer/      Tegra build fixes
+  hardware/broadcom/wlan/          wifi_hal use-after-free guard
+  system/memory/lmkd/              workingset_refault counter wrap
+  system/netd/                     NFLOG group removal
+  system/connectivity/wificond/    BCM4350 ext-features log level
+  system/sepolicy/                 webview_zygote pgroup rules
+  system/bt/                      LDAC codec unavailable
+  device/xiaomi/mocha/             drop ro.hardware.vulkan=nvgpu
+  vendor/lineage/                 soong generated_kernel_headers stub
+
+All patches above are committed in their respective repos (local
+commits on top of upstream); the .patch files here are the persistent
+record and the means to re-apply on a fresh tree.

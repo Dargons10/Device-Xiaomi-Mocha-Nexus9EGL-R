@@ -1,0 +1,17 @@
+diff --git a/stack/a2dp/a2dp_codec_config.cc b/stack/a2dp/a2dp_codec_config.cc
+index 5f4371fbc..ee5d5f42c 100644
+--- a/stack/a2dp/a2dp_codec_config.cc
++++ b/stack/a2dp/a2dp_codec_config.cc
+@@ -131,10 +131,9 @@ A2dpCodecConfig* A2dpCodecConfig::createCodec(
+     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+       break;
+     case BTAV_A2DP_CODEC_INDEX_SOURCE_LDAC:
+-      codec_config = new A2dpCodecConfigLdacSource(codec_priority);
+-      break;
+     case BTAV_A2DP_CODEC_INDEX_SINK_LDAC:
+-      codec_config = new A2dpCodecConfigLdacSink(codec_priority);
++      // LDAC decoder/encoder library (libldacBT_bco.so) is not available on
++      // this device; do not create the LDAC codec to avoid the dlopen error.
+       break;
+     case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_TWS:
+       break;

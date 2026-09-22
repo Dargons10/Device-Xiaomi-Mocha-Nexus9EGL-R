@@ -1,0 +1,39 @@
+diff --git a/src/com/android/gallery3d/app/MovieActivity.java b/src/com/android/gallery3d/app/MovieActivity.java
+index fa4a0f970..ccca372eb 100644
+--- a/src/com/android/gallery3d/app/MovieActivity.java
++++ b/src/com/android/gallery3d/app/MovieActivity.java
+@@ -70,7 +70,7 @@ import org.codeaurora.gallery3d.video.MovieTitleHelper;
+ public class MovieActivity extends AbstractPermissionActivity {
+     @SuppressWarnings("unused")
+     private static final String  TAG = "MovieActivity";
+-    private static final boolean LOG = false;
++    private static final boolean LOG = true;
+     public  static final String  KEY_LOGO_BITMAP = "logo-bitmap";
+     public  static final String  KEY_TREAT_UP_AS_BACK = "treat-up-as-back";
+     private static final String  VIDEO_SDP_MIME_TYPE = "application/sdp";
+diff --git a/src/com/android/gallery3d/app/MoviePlayer.java b/src/com/android/gallery3d/app/MoviePlayer.java
+index 7db8dcfa0..9b93cff18 100755
+--- a/src/com/android/gallery3d/app/MoviePlayer.java
++++ b/src/com/android/gallery3d/app/MoviePlayer.java
+@@ -79,7 +79,7 @@ public class MoviePlayer implements
+         MediaPlayer.OnBufferingUpdateListener {
+     @SuppressWarnings("unused")
+     private static final String TAG = "MoviePlayer";
+-    private static final boolean LOG = false;
++    private static final boolean LOG = true;
+ 
+     private static final String KEY_VIDEO_POSITION = "video-position";
+     private static final String KEY_RESUMEABLE_TIME = "resumeable-timeout";
+diff --git a/src/org/codeaurora/gallery3d/video/CodeauroraVideoView.java b/src/org/codeaurora/gallery3d/video/CodeauroraVideoView.java
+index 415972aee..6b5a9bef0 100644
+--- a/src/org/codeaurora/gallery3d/video/CodeauroraVideoView.java
++++ b/src/org/codeaurora/gallery3d/video/CodeauroraVideoView.java
+@@ -45,7 +45,7 @@ import java.util.Map;
+  * such as scaling and tinting.
+  */
+ public class CodeauroraVideoView extends SurfaceView implements MediaPlayerControl, ScreenModeListener{
+-    private static final boolean LOG = false;
++    private static final boolean LOG = true;
+     private String TAG = "CodeauroraVideoView";
+     // settable by the client
+     private Uri         mUri;

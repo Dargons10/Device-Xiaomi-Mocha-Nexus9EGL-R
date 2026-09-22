@@ -1,0 +1,13 @@
+diff --git a/net/netlink_utils.cpp b/net/netlink_utils.cpp
+index c31249d..cf6af42 100644
+--- a/net/netlink_utils.cpp
++++ b/net/netlink_utils.cpp
+@@ -367,7 +367,7 @@ bool NetlinkUtils::ParseWiphyInfoFromPacket(
+   std::vector<uint8_t> ext_feature_flags_bytes;
+   if (!packet.GetAttributeValue(NL80211_ATTR_EXT_FEATURES,
+                                 &ext_feature_flags_bytes)) {
+-    LOG(WARNING) << "Failed to get NL80211_ATTR_EXT_FEATURES";
++    LOG(INFO) << "NL80211_ATTR_EXT_FEATURES not available (BCM4350)";
+   }
+   *out_wiphy_features = WiphyFeatures(feature_flags,
+                                       ext_feature_flags_bytes);
