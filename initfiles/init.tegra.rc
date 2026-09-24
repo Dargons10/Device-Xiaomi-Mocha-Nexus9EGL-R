@@ -257,9 +257,22 @@ on property:sys.boot_completed=1
     stop logger
     # Disable AudioFx (crash-loop on this device)
     exec /system/bin/pm disable org.lineageos.audiofx
-    # CPU performance for stable video playback
-    exec /system/bin/sh -c "echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-    exec /system/bin/sh -c "echo 2116500 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
-    # GPU max frequency (fixes 5000+ missed frames / visible artifacts)
-    exec /system/bin/sh -c "echo 852000000 > /dev/gpu_freq_min"
+    # CPU: interactive governor with aggressive boost for stable video
+    # playback. Pinning governor+min_freq+GPU floor to the ceiling (previous
+    # hack) blocked Tegra CPU/GPU rail gating and hung resume from suspend
+    # (black screen on wake). Cap only, never floor.
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor interactive
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 204000
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 2218000
+    write /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq 1428000
+    write /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load 90
+    write /sys/devices/system/cpu/cpufreq/interactive/timer_rate 20000
+    write /sys/devices/system/cpu/cpufreq/interactive/timer_slack 20000
+    write /sys/devices/system/cpu/cpufreq/interactive/min_sample_time 20000
+    write /sys/devices/system/cpu/cpufreq/interactive/above_hispeed_delay 40000
+    write /sys/devices/system/cpu/cpufreq/interactive/target_loads 80
+    write /sys/devices/system/cpu/cpufreq/interactive/io_is_busy 1
+    write /sys/devices/system/cpu/cpufreq/interactive/io_busy_threshold 100
+    # GPU: allow DVFS across the full range up to 852 MHz (fixes 5000+ missed
+    # frames / visible artifacts without pinning the floor).
     exec /system/bin/sh -c "echo 852000000 > /dev/gpu_freq_max"
