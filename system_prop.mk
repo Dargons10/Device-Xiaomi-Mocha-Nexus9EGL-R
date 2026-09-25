@@ -109,7 +109,8 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.sys.sdcardfs=true \
     persist.sys.fuse=false \
-    persist.sys.fuse.passthrough=false
+    persist.sys.fuse.passthrough=false \
+    persist.sys.fflag.override.settings_fuse=false
 
 
 # MediaProvider FUSE passthrough deadlocks /storage/emulated (ENOTCONN until
