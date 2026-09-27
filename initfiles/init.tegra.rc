@@ -276,3 +276,5 @@ on property:sys.boot_completed=1
     # GPU: allow DVFS across the full range up to 852 MHz (fixes 5000+ missed
     # frames / visible artifacts without pinning the floor).
     exec /system/bin/sh -c "echo 852000000 > /dev/gpu_freq_max"
+    # Ensure DCIM/Camera exists (MediaProvider only creates DCIM, not the Camera subdir)
+    exec /system/bin/sh -c "mkdir -p /storage/emulated/0/DCIM/Camera"
