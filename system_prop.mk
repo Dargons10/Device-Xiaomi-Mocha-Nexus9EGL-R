@@ -61,9 +61,9 @@ PRODUCT_PROPERTY_OVERRIDES += \
     debug.hwui.use_buffer_age=false \
     debug.hwui.renderer=opengl \
     ro.surface_flinger.max_frame_buffer_acquired_buffers=2 \
-    debug.sf.disable_hwc=0 \
-    ro.sf.use_hwc_vsync=1 \
-    persist.sf.force_gpu_composition=0
+    debug.sf.disable_hwc=1 \
+    ro.sf.use_hwc_vsync=0 \
+    persist.sf.force_gpu_composition=1
 
 # Lineage genuine
 PRODUCT_PROPERTY_OVERRIDES += \
